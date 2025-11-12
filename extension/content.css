@@ -1,0 +1,60 @@
+/* Chaptr extension styles */
+
+.chaptr-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white !important;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+
+.chaptr-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.chaptr-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.chaptr-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal animations */
+#chaptr-modal-overlay {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Scrollbar styling for modal */
+#chaptr-modal-overlay div::-webkit-scrollbar {
+  width: 8px;
+}
+
+#chaptr-modal-overlay div::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+#chaptr-modal-overlay div::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+#chaptr-modal-overlay div::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

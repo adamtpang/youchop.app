@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chaptr</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .logo {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .tagline {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .credits-box {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      backdrop-filter: blur(10px);
+    }
+
+    .credits-balance {
+      text-align: center;
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .credits-label {
+      text-align: center;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .stat-box {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .primary-btn {
+      background: white;
+      color: #667eea;
+    }
+
+    .secondary-btn {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .earn-tips {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 15px;
+    }
+
+    .earn-tips h3 {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .earn-tips ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .earn-tips li {
+      margin-bottom: 5px;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .earn-tips li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .error {
+      background: rgba(255, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .auth-prompt {
+      text-align: center;
+      padding: 10px;
+    }
+
+    .auth-prompt button {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading">⏳ Loading...</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
