@@ -1,0 +1,51 @@
+CHAPTR PRIVACY POLICY
+Last Updated: November 17, 2024
+
+DATA COLLECTION
+Chaptr does NOT collect, store, or transmit any personal data.
+
+LOCAL STORAGE ONLY
+The extension uses Chrome's local storage API to save:
+- Demo credit balance (stored locally on your device)
+- Extension settings and preferences
+
+All data remains on your device and is never sent to external servers.
+
+DEMO MODE
+This version operates in demo mode with:
+- No backend server connections
+- No analytics or tracking
+- No user accounts or authentication
+- All processing happens locally in your browser
+
+PERMISSIONS EXPLAINED
+The extension requests these permissions:
+
+- storage: Save settings locally in your browser
+- tabs: Open welcome page when extension is installed
+- identity: Reserved for future authentication (not used in demo)
+- youtube.com: Access YouTube pages to inject the Chapterize button
+
+NO THIRD-PARTY SERVICES
+Demo mode does not use any third-party services, analytics, or tracking tools.
+
+FUTURE VERSIONS
+When the full version launches with backend features, this policy will be updated to reflect:
+- User authentication
+- Credit purchase processing
+- Chapter caching for faster performance
+
+Users will be notified of any changes to this privacy policy.
+
+CHILDREN'S PRIVACY
+This extension does not knowingly collect information from children under 13.
+
+CONTACT
+For privacy questions or concerns:
+Email: support@chaptr.app
+Website: https://chaptr.app
+
+CHANGES TO THIS POLICY
+We may update this privacy policy from time to time. Changes will be posted on this page with an updated "Last Updated" date.
+
+By using Chaptr, you agree to this privacy policy.

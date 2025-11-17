@@ -1,0 +1,121 @@
+===========================================
+CHROME WEB STORE LISTING - COPY & PASTE
+===========================================
+
+NAME:
+Chaptr - AI YouTube Chapters
+
+SHORT DESCRIPTION (132 characters max):
+Instantly add AI-generated chapters to any YouTube video. Navigate videos faster with smart timestamps.
+
+DETAILED DESCRIPTION:
+Transform how you watch YouTube videos with Chaptr - the AI-powered chapter generator that adds smart navigation to any video in seconds.
+
+🎯 WHAT CHAPTR DOES:
+• Automatically generates chapters with timestamps for YouTube videos
+• Creates descriptive titles and summaries for each section
+• Lets you jump to any part of the video instantly
+• Works on any YouTube video page
+
+⚡ HOW IT WORKS:
+1. Install the extension
+2. Go to any YouTube video
+3. Click the "Chapterize" button
+4. Get instant chapters with one click!
+
+✨ KEY FEATURES:
+✓ AI-powered chapter generation
+✓ Smart timestamp detection
+✓ Descriptive chapter titles
+✓ Click to jump to any section
+✓ Clean, intuitive interface
+✓ No signup required for demo
+
+📚 PERFECT FOR:
+- Students watching educational content
+- Professionals reviewing long presentations
+- Anyone who wants to navigate videos efficiently
+- Content creators analyzing competitor videos
+
+🎁 DEMO MODE:
+This version includes 10 free demo credits so you can try the extension immediately. The demo generates sample chapters to showcase the functionality. Full version with real AI chapterization coming soon!
+
+🔒 PRIVACY:
+- No data collection in demo mode
+- Local processing only
+- Works entirely in your browser
+- See full privacy policy at chaptr.app/privacy
+
+💬 SUPPORT:
+Visit chaptr.app for documentation and support.
+
+Built with modern Chrome extension technology (Manifest V3) for security and performance.
+
+---
+
+CATEGORY:
+Productivity
+
+LANGUAGE:
+English
+
+WEBSITE:
+https://chaptr.app
+
+SUPPORT EMAIL:
+support@chaptr.app
+
+---
+
+PERMISSIONS JUSTIFICATION:
+
+storage:
+Used to store user settings and demo credit balance locally in the browser. No data is sent to external servers.
+
+identity:
+Reserved for future user authentication feature. Not currently used in demo mode.
+
+tabs:
+Used to open a welcome page when the extension is first installed.
+
+Host permission - youtube.com:
+Required to inject the Chapterize button into YouTube video pages and read video metadata (title, duration) for chapter generation.
+
+Host permission - chaptr.app:
+Reserved for future backend API connection. Not used in demo mode.
+
+Host permission - supabase.co:
+Reserved for future database connection. Not used in demo mode.
+
+---
+
+PRIVACY POLICY:
+[Paste contents of PRIVACY_POLICY.txt OR provide URL]
+
+---
+
+SINGLE PURPOSE DESCRIPTION:
+Generate chapter navigation with timestamps for YouTube videos to help users navigate video content more efficiently.
+
+---
+
+DATA USAGE DISCLOSURE:
+This extension does not collect, store, or transmit any user data.
+All processing happens locally in the user's browser.
+
+===========================================
+END OF LISTING
+===========================================
+
+TIPS FOR SUBMISSION:
+1. Copy each section into the corresponding field
+2. Upload 5 screenshots (any size, Chrome resizes them)
+3. Use the privacy policy text above
+4. Submit for review
+5. Wait 1-3 business days
+
+AFTER APPROVAL:
+You'll get a link like:
+https://chrome.google.com/webstore/detail/[YOUR-EXTENSION-ID]
+
+Share this link to show your client the live extension!
