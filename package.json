@@ -11,26 +11,34 @@
     "db:migrate": "supabase migration up"
   },
   "dependencies": {
+    "@radix-ui/react-switch": "^1.2.6",
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.553.0",
+    "motion": "^12.23.24",
     "next": "^14.0.4",
+    "openai": "^4.24.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.39.0",
     "stripe": "^14.10.0",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "vercel": "^48.10.2",
     "youtube-transcript": "^1.2.1",
-    "openai": "^4.24.1",
-    "axios": "^1.6.2",
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/chrome": "^0.0.256",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
-    "@types/chrome": "^0.0.256",
-    "typescript": "^5.3.3",
     "autoprefixer": "^10.4.16",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.0.4",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
-    "eslint": "^8.56.0",
-    "eslint-config-next": "^14.0.4"
+    "typescript": "^5.3.3"
   }
 }
