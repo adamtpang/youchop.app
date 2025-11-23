@@ -1,312 +1,423 @@
+"use client"
+
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { MotionWrapper, StaggerContainer } from '@/components/motion-wrapper';
+import { Zap, Video, MessageSquare, Sparkles, Target, Globe, DollarSign, Clock, Check } from 'lucide-react';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       {/* Hero Section */}
-      <section className="gradient-bg text-white py-20 px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="text-6xl mb-6">⚡</div>
-          <h1 className="text-5xl md:text-7xl font-bold mb-6">
-            AI YouTube Chapters
-          </h1>
-          <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">
-            Instantly add chapters to any YouTube video. Earn free credits by sharing with others.
-          </p>
+      <section className="relative overflow-hidden bg-gradient-to-br from-violet via-sky to-teal py-24 px-6">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative max-w-6xl mx-auto text-center text-white z-10">
+          <MotionWrapper variant="scaleIn">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-sm rounded-2xl mb-6">
+              <Zap className="h-12 w-12" />
+            </div>
+          </MotionWrapper>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <a
-              href="https://chrome.google.com/webstore"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:shadow-2xl transition-all transform hover:scale-105"
-            >
-              Add to Chrome - Free
-            </a>
-            <Link
-              href="#how-it-works"
-              className="border-2 border-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-white hover:text-purple-600 transition-all"
-            >
-              Learn More
-            </Link>
-          </div>
+          <MotionWrapper variant="fadeIn" delay={0.1}>
+            <h1 className="text-6xl md:text-8xl font-bold mb-6 tracking-tight">
+              YouChop
+            </h1>
+          </MotionWrapper>
 
-          <div className="flex flex-wrap gap-6 justify-center text-sm opacity-90">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">✓</span>
-              <span>5 Free Credits on Signup</span>
+          <MotionWrapper variant="fadeIn" delay={0.2}>
+            <p className="text-xl md:text-2xl mb-10 opacity-95 max-w-3xl mx-auto leading-relaxed">
+              Chop any YouTube video into AI-powered chapters. Instant navigation, perfect timestamps.
+            </p>
+          </MotionWrapper>
+
+          <MotionWrapper variant="fadeIn" delay={0.3}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+              <Button
+                asChild
+                size="lg"
+                className="bg-white text-violet hover:bg-white/90 hover:scale-105 transition-transform text-lg px-8 py-6 h-auto"
+              >
+                <a
+                  href="https://chrome.google.com/webstore"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Zap className="mr-2 h-5 w-5" />
+                  Add to Chrome - Free
+                </a>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="border-2 border-white text-white hover:bg-white hover:text-violet transition-colors text-lg px-8 py-6 h-auto"
+              >
+                <Link href="#how-it-works">
+                  Learn More
+                </Link>
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">✓</span>
-              <span>Earn Credits by Sharing</span>
+          </MotionWrapper>
+
+          <MotionWrapper variant="fadeIn" delay={0.4}>
+            <div className="flex flex-wrap gap-6 justify-center text-sm">
+              <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 px-4 py-2">
+                <Check className="mr-2 h-4 w-4" />
+                5 Free Credits on Signup
+              </Badge>
+              <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 px-4 py-2">
+                <Check className="mr-2 h-4 w-4" />
+                Earn Credits by Sharing
+              </Badge>
+              <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 px-4 py-2">
+                <Check className="mr-2 h-4 w-4" />
+                Instant Results
+              </Badge>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">✓</span>
-              <span>Instant Results</span>
-            </div>
-          </div>
+          </MotionWrapper>
         </div>
       </section>
 
       {/* Demo Video Section */}
-      <section className="py-20 px-6 bg-gray-50">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">See It In Action</h2>
-          <div className="aspect-video bg-gray-200 rounded-xl flex items-center justify-center">
-            <p className="text-gray-500">[Demo video placeholder]</p>
-          </div>
+      <section className="py-24 px-6 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <MotionWrapper variant="fadeIn">
+            <h2 className="text-4xl md:text-5xl font-bold text-center mb-8 text-gray-900">See It In Action</h2>
+          </MotionWrapper>
+          <MotionWrapper variant="scaleIn" delay={0.1}>
+            <Card className="overflow-hidden border-2 shadow-2xl">
+              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                <div className="text-center">
+                  <Video className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg">Demo video coming soon</p>
+                </div>
+              </div>
+            </Card>
+          </MotionWrapper>
         </div>
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="py-20 px-6">
+      <section id="how-it-works" className="py-24 px-6 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
+          <MotionWrapper variant="fadeIn">
+            <h2 className="text-4xl md:text-5xl font-bold text-center mb-6 text-gray-900">How It Works</h2>
+            <p className="text-center text-gray-700 mb-16 text-lg max-w-2xl mx-auto">
+              Three simple steps to transform any YouTube video with AI-powered chapters
+            </p>
+          </MotionWrapper>
 
-          <div className="grid md:grid-cols-3 gap-12">
-            <div className="text-center">
-              <div className="text-5xl mb-4">🎬</div>
-              <h3 className="text-2xl font-bold mb-3">1. Watch Video</h3>
-              <p className="text-gray-600">
-                Find any YouTube video you want to chapterize
-              </p>
-            </div>
+          <StaggerContainer className="grid md:grid-cols-3 gap-8">
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full text-center hover:shadow-xl transition-shadow border-2 hover:border-sky">
+                <CardHeader>
+                  <div className="mx-auto w-16 h-16 bg-sky/10 rounded-xl flex items-center justify-center mb-4">
+                    <Video className="h-8 w-8 text-sky" />
+                  </div>
+                  <Badge className="mb-4 mx-auto bg-sky text-white">Step 1</Badge>
+                  <CardTitle className="text-2xl">Watch Video</CardTitle>
+                  <CardDescription className="text-base">
+                    Find any YouTube video you want to chapterize
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div className="text-center">
-              <div className="text-5xl mb-4">⚡</div>
-              <h3 className="text-2xl font-bold mb-3">2. Click Chapterize</h3>
-              <p className="text-gray-600">
-                AI analyzes the video and creates perfect chapters in seconds
-              </p>
-            </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full text-center hover:shadow-xl transition-shadow border-2 hover:border-violet">
+                <CardHeader>
+                  <div className="mx-auto w-16 h-16 bg-violet/10 rounded-xl flex items-center justify-center mb-4">
+                    <Sparkles className="h-8 w-8 text-violet" />
+                  </div>
+                  <Badge className="mb-4 mx-auto bg-violet text-white">Step 2</Badge>
+                  <CardTitle className="text-2xl">Click Chapterize</CardTitle>
+                  <CardDescription className="text-base">
+                    AI analyzes the video and creates perfect chapters in seconds
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div className="text-center">
-              <div className="text-5xl mb-4">💬</div>
-              <h3 className="text-2xl font-bold mb-3">3. Share & Earn</h3>
-              <p className="text-gray-600">
-                Post as a comment and earn +2 credits back!
-              </p>
-            </div>
-          </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full text-center hover:shadow-xl transition-shadow border-2 hover:border-teal">
+                <CardHeader>
+                  <div className="mx-auto w-16 h-16 bg-teal/10 rounded-xl flex items-center justify-center mb-4">
+                    <MessageSquare className="h-8 w-8 text-teal" />
+                  </div>
+                  <Badge className="mb-4 mx-auto bg-teal text-white">Step 3</Badge>
+                  <CardTitle className="text-2xl">Share & Earn</CardTitle>
+                  <CardDescription className="text-base">
+                    Post as a comment and earn +2 credits back instantly
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
+          </StaggerContainer>
         </div>
       </section>
 
       {/* Credit Economy */}
-      <section className="py-20 px-6 bg-gray-50">
+      <section className="py-24 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4">Smart Credit Economy</h2>
-          <p className="text-center text-gray-600 mb-16 text-lg">
-            Use credits to chapterize videos. Earn them back by sharing!
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-8 mb-16">
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <h3 className="text-2xl font-bold mb-6 gradient-text">Cost to Chapterize</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg">Short videos (&lt;15 min)</span>
-                  <span className="font-bold text-xl">1 credit</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg">Medium videos (15-60 min)</span>
-                  <span className="font-bold text-xl">2 credits</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg">Long videos (60+ min)</span>
-                  <span className="font-bold text-xl">3 credits</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <h3 className="text-2xl font-bold mb-6 gradient-text">Earn Free Credits</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg">Sign up bonus</span>
-                  <span className="font-bold text-xl text-green-600">+5 credits</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg">Post chapter comment</span>
-                  <span className="font-bold text-xl text-green-600">+2 credits</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg">Referral signup</span>
-                  <span className="font-bold text-xl text-green-600">+10 credits</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <p className="text-lg text-gray-700 mb-6">
-              💡 <strong>Viral Loop:</strong> Chapterize (spend 1-3) → Post comment (earn +2) = Net positive or break even!
+          <MotionWrapper variant="fadeIn">
+            <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-gray-900">Smart Credit Economy</h2>
+            <p className="text-center text-gray-700 mb-16 text-lg max-w-2xl mx-auto">
+              Use credits to chapterize videos. Earn them back by sharing with the community!
             </p>
+          </MotionWrapper>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-12">
+            <MotionWrapper variant="slideInFromLeft">
+              <Card className="h-full border-2 hover:shadow-xl transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-coral/10 rounded-lg flex items-center justify-center">
+                      <DollarSign className="h-6 w-6 text-coral" />
+                    </div>
+                    <CardTitle className="text-2xl">Cost to Chapterize</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-gray-500" />
+                      <span className="text-lg">Short videos (&lt;15 min)</span>
+                    </div>
+                    <Badge className="bg-coral text-white">1 credit</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-gray-500" />
+                      <span className="text-lg">Medium (15-60 min)</span>
+                    </div>
+                    <Badge className="bg-coral text-white">2 credits</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-gray-500" />
+                      <span className="text-lg">Long videos (60+ min)</span>
+                    </div>
+                    <Badge className="bg-coral text-white">3 credits</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </MotionWrapper>
+
+            <MotionWrapper variant="slideInFromRight">
+              <Card className="h-full border-2 hover:shadow-xl transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-teal/10 rounded-lg flex items-center justify-center">
+                      <Sparkles className="h-6 w-6 text-teal" />
+                    </div>
+                    <CardTitle className="text-2xl">Earn Free Credits</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span className="text-lg">Sign up bonus</span>
+                    <Badge className="bg-teal text-white">+5 credits</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span className="text-lg">Post chapter comment</span>
+                    <Badge className="bg-teal text-white">+2 credits</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <span className="text-lg">Referral signup</span>
+                    <Badge className="bg-teal text-white">+10 credits</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </MotionWrapper>
           </div>
-        </div>
-      </section>
 
-      {/* Pricing */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4">Need More Credits?</h2>
-          <p className="text-center text-gray-600 mb-16 text-lg">
-            Purchase credit packages for unlimited chapterizing
-          </p>
-
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-xl border-2 border-gray-200 hover:border-purple-500 transition-all">
-              <h3 className="text-xl font-bold mb-2">Starter</h3>
-              <div className="text-3xl font-bold mb-2">$5</div>
-              <div className="text-gray-600 mb-4">25 credits</div>
-              <div className="text-sm text-gray-500">~10 hours of content</div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl border-4 border-purple-500 relative transform scale-105">
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-purple-500 text-white px-4 py-1 rounded-full text-sm font-bold">
-                MOST POPULAR
-              </div>
-              <h3 className="text-xl font-bold mb-2">Popular</h3>
-              <div className="text-3xl font-bold mb-2">$10</div>
-              <div className="text-gray-600 mb-4">60 credits</div>
-              <div className="text-sm text-gray-500">~25 hours of content</div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl border-2 border-gray-200 hover:border-purple-500 transition-all">
-              <h3 className="text-xl font-bold mb-2">Pro</h3>
-              <div className="text-3xl font-bold mb-2">$25</div>
-              <div className="text-gray-600 mb-4">150 credits</div>
-              <div className="text-sm text-gray-500">~60 hours of content</div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl border-2 border-gray-200 hover:border-purple-500 transition-all">
-              <h3 className="text-xl font-bold mb-2">Ultimate</h3>
-              <div className="text-3xl font-bold mb-2">$50</div>
-              <div className="text-gray-600 mb-4">350 credits</div>
-              <div className="text-sm text-gray-500">~140 hours of content</div>
-            </div>
-          </div>
+          <MotionWrapper variant="fadeIn">
+            <Card className="bg-gradient-to-r from-amber/10 to-amber/5 border-2 border-amber">
+              <CardContent className="pt-6">
+                <p className="text-lg text-center">
+                  <Sparkles className="inline h-6 w-6 text-amber mr-2" />
+                  <strong>Viral Loop:</strong> Chapterize (spend 1-3) → Post comment (earn +2) = Net positive or break even!
+                </p>
+              </CardContent>
+            </Card>
+          </MotionWrapper>
         </div>
       </section>
 
       {/* Benefits */}
-      <section className="py-20 px-6 bg-gray-50">
+      <section className="py-24 px-6 bg-gradient-to-b from-white to-gray-50">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16">Why Chaptr?</h2>
+          <MotionWrapper variant="fadeIn">
+            <h2 className="text-4xl md:text-5xl font-bold text-center mb-16 text-gray-900">Why YouChop?</h2>
+          </MotionWrapper>
 
-          <div className="grid md:grid-cols-3 gap-12">
-            <div>
-              <div className="text-4xl mb-4">⚡</div>
-              <h3 className="text-xl font-bold mb-3">Instant Results</h3>
-              <p className="text-gray-600">
-                Already chapterized videos load instantly from our cache. No waiting!
-              </p>
-            </div>
+          <StaggerContainer className="grid md:grid-cols-3 gap-8">
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-sky/10 rounded-lg flex items-center justify-center mb-4">
+                    <Zap className="h-6 w-6 text-sky" />
+                  </div>
+                  <CardTitle>Instant Results</CardTitle>
+                  <CardDescription>
+                    Already chapterized videos load instantly from our cache. No waiting!
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div>
-              <div className="text-4xl mb-4">🤖</div>
-              <h3 className="text-xl font-bold mb-3">AI-Powered</h3>
-              <p className="text-gray-600">
-                Advanced AI analyzes transcripts to create perfect chapter breakpoints
-              </p>
-            </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-violet/10 rounded-lg flex items-center justify-center mb-4">
+                    <Sparkles className="h-6 w-6 text-violet" />
+                  </div>
+                  <CardTitle>AI-Powered</CardTitle>
+                  <CardDescription>
+                    Advanced AI analyzes transcripts to create perfect chapter breakpoints
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div>
-              <div className="text-4xl mb-4">🔄</div>
-              <h3 className="text-xl font-bold mb-3">Viral Growth</h3>
-              <p className="text-gray-600">
-                Every comment you post helps others discover Chaptr and earns you credits
-              </p>
-            </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-teal/10 rounded-lg flex items-center justify-center mb-4">
+                    <MessageSquare className="h-6 w-6 text-teal" />
+                  </div>
+                  <CardTitle>Viral Growth</CardTitle>
+                  <CardDescription>
+                    Every comment you post helps others discover YouChop and earns you credits
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div>
-              <div className="text-4xl mb-4">💰</div>
-              <h3 className="text-xl font-bold mb-3">Earn Free Credits</h3>
-              <p className="text-gray-600">
-                Unlimited earning potential by sharing chapters with the community
-              </p>
-            </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-amber/10 rounded-lg flex items-center justify-center mb-4">
+                    <DollarSign className="h-6 w-6 text-amber" />
+                  </div>
+                  <CardTitle>Earn Free Credits</CardTitle>
+                  <CardDescription>
+                    Unlimited earning potential by sharing chapters with the community
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div>
-              <div className="text-4xl mb-4">🎯</div>
-              <h3 className="text-xl font-bold mb-3">Perfect Accuracy</h3>
-              <p className="text-gray-600">
-                Smart chapter detection finds natural topic transitions in any video
-              </p>
-            </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-coral/10 rounded-lg flex items-center justify-center mb-4">
+                    <Target className="h-6 w-6 text-coral" />
+                  </div>
+                  <CardTitle>Perfect Accuracy</CardTitle>
+                  <CardDescription>
+                    Smart chapter detection finds natural topic transitions in any video
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
 
-            <div>
-              <div className="text-4xl mb-4">🌐</div>
-              <h3 className="text-xl font-bold mb-3">Works Everywhere</h3>
-              <p className="text-gray-600">
-                Simple Chrome extension that works on any YouTube video page
-              </p>
-            </div>
-          </div>
+            <MotionWrapper variant="fadeIn">
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-sky/10 rounded-lg flex items-center justify-center mb-4">
+                    <Globe className="h-6 w-6 text-sky" />
+                  </div>
+                  <CardTitle>Works Everywhere</CardTitle>
+                  <CardDescription>
+                    Simple Chrome extension that works on any YouTube video page
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </MotionWrapper>
+          </StaggerContainer>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="gradient-bg text-white py-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Start Chapterizing Today
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of users creating better YouTube experiences
-          </p>
-          <a
-            href="https://chrome.google.com/webstore"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block bg-white text-purple-600 px-10 py-5 rounded-lg font-bold text-xl hover:shadow-2xl transition-all transform hover:scale-105"
-          >
-            Add to Chrome - Free
-          </a>
-          <p className="mt-6 text-sm opacity-80">
-            Get 5 free credits instantly • No credit card required
-          </p>
+      <section className="relative overflow-hidden bg-gradient-to-br from-violet via-sky to-teal py-24 px-6">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative max-w-4xl mx-auto text-center text-white z-10">
+          <MotionWrapper variant="scaleIn">
+            <h2 className="text-4xl md:text-6xl font-bold mb-6">
+              Start Chapterizing Today
+            </h2>
+          </MotionWrapper>
+          <MotionWrapper variant="fadeIn" delay={0.1}>
+            <p className="text-xl mb-10 opacity-95 max-w-2xl mx-auto">
+              Join thousands of users creating better YouTube experiences
+            </p>
+          </MotionWrapper>
+          <MotionWrapper variant="fadeIn" delay={0.2}>
+            <Button
+              asChild
+              size="lg"
+              className="bg-white text-violet hover:bg-white/90 hover:scale-105 transition-transform text-xl px-12 py-8 h-auto"
+            >
+              <a
+                href="https://chrome.google.com/webstore"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Zap className="mr-3 h-6 w-6" />
+                Add to Chrome - Free
+              </a>
+            </Button>
+          </MotionWrapper>
+          <MotionWrapper variant="fadeIn" delay={0.3}>
+            <p className="mt-6 text-sm opacity-90">
+              Get 5 free credits instantly • No credit card required
+            </p>
+          </MotionWrapper>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-6">
+      <footer className="bg-gray-900 text-white py-16 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
             <div>
-              <div className="text-3xl mb-3">⚡</div>
-              <h3 className="font-bold text-lg mb-2">Chaptr</h3>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet to-sky rounded-lg flex items-center justify-center">
+                  <Zap className="h-6 w-6" />
+                </div>
+                <h3 className="font-bold text-xl">YouChop</h3>
+              </div>
               <p className="text-sm text-gray-400">AI YouTube Chapters</p>
             </div>
 
             <div>
-              <h4 className="font-bold mb-3">Product</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="#how-it-works">How It Works</Link></li>
-                <li><Link href="/credits">Pricing</Link></li>
-                <li><Link href="/welcome">Get Started</Link></li>
+              <h4 className="font-bold mb-4 text-lg">Product</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><Link href="#how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
+                <li><Link href="/credits" className="hover:text-white transition-colors">Pricing</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-bold mb-3">Resources</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="/docs">Documentation</Link></li>
-                <li><Link href="/support">Support</Link></li>
-                <li><Link href="/blog">Blog</Link></li>
+              <h4 className="font-bold mb-4 text-lg">Extension</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="https://chrome.google.com/webstore" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Chrome Web Store</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-bold mb-3">Legal</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="/privacy">Privacy Policy</Link></li>
-                <li><Link href="/terms">Terms of Service</Link></li>
+              <h4 className="font-bold mb-4 text-lg">Connect</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li className="text-gray-500">Coming soon</li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2024 Chaptr. All rights reserved.</p>
+            <p>&copy; 2024 YouChop. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-// Popup script for Chaptr extension
+// Popup script for YouChop extension
 const app = document.getElementById('app');
 
 // Load user data on popup open
@@ -38,7 +38,7 @@ function showAuthPrompt() {
   app.innerHTML = `
     <div class="header">
       <div class="logo">⚡</div>
-      <h1>Chaptr</h1>
+      <h1>YouChop</h1>
       <p class="tagline">AI YouTube Chapters</p>
     </div>
 
@@ -86,7 +86,7 @@ function showDashboard(data) {
   app.innerHTML = `
     <div class="header">
       <div class="logo">⚡</div>
-      <h1>Chaptr</h1>
+      <h1>YouChop</h1>
       <p class="tagline">AI YouTube Chapters</p>
     </div>
 
@@ -116,7 +116,7 @@ function showDashboard(data) {
 
     <div class="actions">
       <button class="primary-btn" id="buy-credits-btn">💎 Purchase Credits</button>
-      <button class="secondary-btn" id="visit-site-btn">🌐 Visit chaptr.app</button>
+      <button class="secondary-btn" id="visit-site-btn">🌐 Visit youchop.app</button>
     </div>
 
     <div class="earn-tips">
@@ -131,11 +131,11 @@ function showDashboard(data) {
 
   // Add event listeners
   document.getElementById('buy-credits-btn').addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://chaptr.app/credits' });
+    chrome.tabs.create({ url: 'https://youchop.app/credits' });
   });
 
   document.getElementById('visit-site-btn').addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://chaptr.app' });
+    chrome.tabs.create({ url: 'https://youchop.app' });
   });
 }
 
@@ -144,7 +144,7 @@ function showError(message) {
   app.innerHTML = `
     <div class="header">
       <div class="logo">⚡</div>
-      <h1>Chaptr</h1>
+      <h1>YouChop</h1>
     </div>
 
     <div class="error">

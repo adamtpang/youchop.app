@@ -1,5 +1,5 @@
-// Background service worker for Chaptr extension (MVP Demo Mode)
-const API_URL = 'https://chaptr.app'; // Update with your deployed Vercel URL
+// Background service worker for YouChop extension (MVP Demo Mode)
+const API_URL = 'https://youchop.app'; // Update with your deployed Vercel URL
 const DEMO_MODE = true; // Set to false when backend is ready
 
 // Listen for messages from content script
@@ -32,7 +32,7 @@ async function authenticateUser() {
     // Create demo user
     const demoUser = {
       id: 'demo-user-' + Date.now(),
-      email: 'demo@chaptr.app',
+      email: 'demo@youchop.app',
       credits_balance: 10
     };
     await chrome.storage.local.set({ user: demoUser });
@@ -183,7 +183,7 @@ chrome.runtime.onInstalled.addListener((details) => {
       // Auto-create demo user
       const demoUser = {
         id: 'demo-user-' + Date.now(),
-        email: 'demo@chaptr.app',
+        email: 'demo@youchop.app',
         credits_balance: 10
       };
       chrome.storage.local.set({ user: demoUser });

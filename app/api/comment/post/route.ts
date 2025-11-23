@@ -67,17 +67,18 @@ export async function POST(request: NextRequest) {
       });
 
     // Update chapterized video stats
-    await supabaseAdmin
-      .rpc('increment', {
-        table_name: 'chapterized_videos',
-        column_name: 'comments_posted',
-        filter_column: 'video_id',
-        filter_value: video_id
-      })
-      .catch(err => {
-        // Non-critical error, just log
-        console.error('Failed to update video comment count:', err);
-      });
+    try {
+      await supabaseAdmin
+        .rpc('increment', {
+          table_name: 'chapterized_videos',
+          column_name: 'comments_posted',
+          filter_column: 'video_id',
+          filter_value: video_id
+        });
+    } catch (err) {
+      // Non-critical error, just log
+      console.error('Failed to update video comment count:', err);
+    }
 
     return NextResponse.json({
       success: true,

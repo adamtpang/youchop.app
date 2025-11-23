@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Chaptr - AI YouTube Chapters",
+  "name": "YouChop - AI YouTube Chapters",
   "version": "1.0.0",
-  "description": "Automatically chapterize YouTube videos with AI. Earn credits by sharing chapters!",
+  "description": "Automatically chop YouTube videos into chapters with AI. Navigate videos like a pro!",
   "permissions": [
     "storage",
     "identity",
@@ -11,7 +11,7 @@
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://youtube.com/*",
-    "https://chaptr.app/*",
+    "https://youchop.app/*",
     "https://*.supabase.co/*"
   ],
   "background": {

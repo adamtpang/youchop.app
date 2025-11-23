@@ -15,24 +15,19 @@ interface MinimalBadgeProps extends Omit<BadgeProps, 'variant'> {
  * - Optional pulsing dot
  * - Fits in compact toolbars and cards
  */
-export const MinimalBadge = React.forwardRef<HTMLDivElement, MinimalBadgeProps>(
-  ({ className, children, count, dot, pulse, ...props }, ref) => {
-    return (
-      <Badge
-        ref={ref}
-        variant="minimal"
-        className={cn(
-          "h-5 min-w-[20px] items-center justify-center",
-          dot && "w-2 h-2 p-0 rounded-full",
-          pulse && "animate-pulse",
-          className
-        )}
-        {...props}
-      >
-        {dot ? null : count !== undefined ? count : children}
-      </Badge>
-    )
-  }
-)
-
-MinimalBadge.displayName = "MinimalBadge"
+export const MinimalBadge: React.FC<MinimalBadgeProps> = ({ className, children, count, dot, pulse, ...props }) => {
+  return (
+    <Badge
+      variant="minimal"
+      className={cn(
+        "h-5 min-w-[20px] items-center justify-center",
+        dot && "w-2 h-2 p-0 rounded-full",
+        pulse && "animate-pulse",
+        className
+      )}
+      {...props}
+    >
+      {dot ? null : count !== undefined ? count : children}
+    </Badge>
+  )
+}

@@ -1,18 +1,25 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Chaptr - AI YouTube Chapters',
-  description: 'Automatically chapterize YouTube videos with AI. Earn credits by sharing chapters!',
-  keywords: 'YouTube, chapters, AI, video, timestamps, chapterize',
+  title: 'YouChop - AI YouTube Chapters',
+  description: 'Chop any YouTube video into AI-powered chapters. Instant navigation, perfect timestamps.',
+  keywords: 'YouTube, chapters, AI, video, timestamps, chapterize, youchop',
   openGraph: {
-    title: 'Chaptr - AI YouTube Chapters',
-    description: 'Automatically chapterize YouTube videos with AI. Earn credits by sharing chapters!',
-    url: 'https://chaptr.app',
-    siteName: 'Chaptr',
+    title: 'YouChop - AI YouTube Chapters',
+    description: 'Chop any YouTube video into AI-powered chapters. Instant navigation, perfect timestamps.',
+    url: 'https://youchop.app',
+    siteName: 'YouChop',
     images: [
       {
-        url: 'https://chaptr.app/og-image.png',
+        url: 'https://youchop.app/og-image.png',
         width: 1200,
         height: 630,
       },
@@ -22,9 +29,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Chaptr - AI YouTube Chapters',
-    description: 'Automatically chapterize YouTube videos with AI. Earn credits by sharing chapters!',
-    images: ['https://chaptr.app/og-image.png'],
+    title: 'YouChop - AI YouTube Chapters',
+    description: 'Chop any YouTube video into AI-powered chapters. Instant navigation, perfect timestamps.',
+    images: ['https://youchop.app/og-image.png'],
   },
 };
 
@@ -35,7 +42,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
     </html>
   );
 }

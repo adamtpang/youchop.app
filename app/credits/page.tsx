@@ -151,7 +151,7 @@ export default function CreditsPage() {
               <h3 className="font-bold text-lg mb-2">Can I earn unlimited free credits?</h3>
               <p className="text-gray-600">
                 Yes! Every time you post chapters as a YouTube comment, you earn +2 credits back.
-                There's no limit to how many you can earn.
+                There&apos;s no limit to how many you can earn.
               </p>
             </div>
 

@@ -1,5 +1,5 @@
 // Content script for YouTube pages (MVP Demo Version)
-console.log('Chaptr extension loaded (Demo Mode)');
+console.log('YouChop extension loaded (Demo Mode)');
 
 let userCredits = null;
 let currentVideoId = null;
@@ -88,7 +88,7 @@ function calculateCreditCost(durationSeconds) {
 }
 
 function addChapterizeButton() {
-  if (document.querySelector('#chaptr-button')) return;
+  if (document.querySelector('#youchop-button')) return;
 
   const rightControls = document.querySelector('.ytp-right-controls');
   if (!rightControls) return;
@@ -96,8 +96,8 @@ function addChapterizeButton() {
   const creditCost = calculateCreditCost(videoData.duration);
 
   const button = document.createElement('button');
-  button.id = 'chaptr-button';
-  button.className = 'ytp-button chaptr-button';
+  button.id = 'youchop-button';
+  button.className = 'ytp-button youchop-button';
 
   let buttonText = '';
   let buttonTitle = '';
@@ -105,7 +105,7 @@ function addChapterizeButton() {
 
   if (userCredits === null) {
     buttonText = '⚡ Chapterize (Demo)';
-    buttonTitle = 'Try Chaptr - Demo Mode';
+    buttonTitle = 'Try YouChop - Demo Mode';
   } else if (userCredits < creditCost) {
     buttonText = `⚡ Need ${creditCost - userCredits} more`;
     buttonTitle = `Insufficient credits. You need ${creditCost} credits but have ${userCredits}.`;
@@ -173,15 +173,15 @@ async function handleChapterizeClick(e) {
 function showDemoModal() {
   const modal = createModal(`
     <div style="text-align: center; padding: 30px;">
-      <h2 style="margin-bottom: 15px; font-size: 28px;">⚡ Chaptr Demo Mode</h2>
+      <h2 style="margin-bottom: 15px; font-size: 28px;">⚡ YouChop Demo Mode</h2>
       <p style="margin-bottom: 20px; font-size: 16px; color: #666;">
-        This is a demonstration of Chaptr's AI-powered chapter generation.
+        This is a demonstration of YouChop's AI-powered chapter generation.
       </p>
       <p style="margin-bottom: 25px; font-size: 14px; color: #888;">
         In demo mode, you have 10 free credits to try the extension.<br>
         Full version coming soon with real-time chapterization!
       </p>
-      <button id="chaptr-start-demo-btn" style="
+      <button id="youchop-start-demo-btn" style="
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
@@ -197,13 +197,13 @@ function showDemoModal() {
     </div>
   `);
 
-  document.getElementById('chaptr-start-demo-btn').addEventListener('click', async () => {
+  document.getElementById('youchop-start-demo-btn').addEventListener('click', async () => {
     modal.remove();
     // Auto-authenticate for demo
     await chrome.runtime.sendMessage({ action: 'authenticate' });
     await fetchCredits();
     // Re-click the chapterize button
-    document.getElementById('chaptr-button').click();
+    document.getElementById('youchop-button').click();
   });
 }
 
@@ -224,7 +224,7 @@ function showInsufficientCreditsModal(required) {
         </ul>
       </div>
 
-      <button id="chaptr-close-btn" style="
+      <button id="youchop-close-btn" style="
         background: #667eea;
         color: white;
         border: none;
@@ -235,7 +235,7 @@ function showInsufficientCreditsModal(required) {
     </div>
   `);
 
-  document.getElementById('chaptr-close-btn').addEventListener('click', () => {
+  document.getElementById('youchop-close-btn').addEventListener('click', () => {
     modal.remove();
   });
 }
@@ -283,7 +283,7 @@ function showChaptersModal(data) {
       </div>
 
       <div style="text-align: center;">
-        <button id="chaptr-close-modal-btn" style="
+        <button id="youchop-close-modal-btn" style="
           background: #667eea;
           color: white;
           border: none;
@@ -311,7 +311,7 @@ function showChaptersModal(data) {
     });
   });
 
-  document.getElementById('chaptr-close-modal-btn').addEventListener('click', () => {
+  document.getElementById('youchop-close-modal-btn').addEventListener('click', () => {
     modal.remove();
   });
 }
@@ -334,7 +334,7 @@ function seekToTimestamp(timestamp) {
 
 function createModal(content) {
   const overlay = document.createElement('div');
-  overlay.id = 'chaptr-modal-overlay';
+  overlay.id = 'youchop-modal-overlay';
   overlay.style.cssText = `
     position: fixed;
     top: 0;
@@ -380,7 +380,7 @@ function observeUrlChanges() {
     if (url !== lastUrl) {
       lastUrl = url;
 
-      const oldButton = document.querySelector('#chaptr-button');
+      const oldButton = document.querySelector('#youchop-button');
       if (oldButton) oldButton.remove();
 
       if (url.includes('/watch')) {
