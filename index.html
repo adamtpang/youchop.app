@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouChop — AI Chapters &amp; Timestamps for YouTube</title>
+<meta name="description" content="Give any YouTube video chapters, instantly. YouChop reads the transcript and adds real, clickable chapters to the seekbar — in YouTube's own player. Free to start. Creators: chapter your entire back-catalog for $99." />
+<meta name="keywords" content="add chapters to youtube video, youtube chapters extension, youtube timestamps generator, auto generate youtube chapters, chapterize youtube video, youtube chapter generator chrome extension, youtube key moments seo" />
+<link rel="canonical" href="https://youchop.app/" />
+<meta property="og:title" content="YouChop — AI Chapters &amp; Timestamps for YouTube" />
+<meta property="og:description" content="Real, clickable chapters in YouTube's own player — on any video the creator never chaptered. Free to start, no card." />
+<meta property="og:url" content="https://youchop.app" />
+<meta property="og:site_name" content="YouChop" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://youchop.app/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="site.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "YouChop",
+  "applicationCategory": "BrowserApplication",
+  "operatingSystem": "Chrome",
+  "description": "AI-generated chapters and timestamps for any YouTube video, rendered in YouTube's native player UI.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "url": "https://youchop.app"
+}
+</script>
+</head>
+<body>
+
+<div class="glow" style="top:-200px; right:-100px; width:600px; height:500px; background:var(--red); opacity:.14"></div>
+<div class="glow" style="top:600px; left:-200px; width:500px; height:500px; background:var(--amber); opacity:.08"></div>
+
+<div class="wrap">
+  <nav>
+    <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
+    <div class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="/creators" class="creator-link">For creators →</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>Give any YouTube video <span class="chopword">chapters</span>. Instantly.</h1>
+    <p class="sub">YouChop reads the transcript and adds <strong>real, clickable chapters to the seekbar</strong> — right in YouTube's own player, on any video the creator never chaptered. Free to start, no card.</p>
+    <div class="cta-row">
+      <a class="btn btn-red" id="install-cta" href="#install">Add to Chrome — it's free</a>
+      <a class="creator-hint" href="/creators">Creators: chapter your entire back-catalog for $99 →</a>
+    </div>
+    <p class="microcopy">5 free chops · no credit card · works on any video with captions</p>
+
+    <!-- ======= the live demo: a seekbar getting chopped ======= -->
+    <div class="player" id="demo" aria-label="Animated demo: a YouTube video gaining chapters">
+      <div class="screen">
+        <span class="vtitle">Deep dive: how container ships actually work</span>
+        <div class="playbtn"></div>
+        <span class="vlen mono">2:14:07</span>
+        <button class="chopbtn" tabindex="-1" aria-hidden="true"><span class="dot"></span>Chapterize</button>
+      </div>
+      <div class="bar-zone">
+        <div class="seekbar">
+          <div class="seg-track" id="track"></div>
+          <div class="chopline"></div>
+          <div class="playhead" id="playhead" style="left:4%"></div>
+          <div class="chapchip" id="chip"><span class="t">14:32</span><span class="n">Why ports are the bottleneck</span></div>
+        </div>
+      </div>
+      <div class="chaplist" id="chaplist"></div>
+    </div>
+    <p class="demo-caption">watch: <span class="stage" id="stagelabel">a 2-hour video with no chapters</span></p>
+  </header>
+</div>
+
+<div class="problem">
+  <div class="wrap">
+    <p class="reveal">Most long videos never get chapters. So you <span class="scrub">scrub blind</span> through a 2-hour podcast looking for the one part you came for.</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <section id="how">
+    <div class="kicker">How it works</div>
+    <h2 class="reveal">Three clicks between you and a navigable video.</h2>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="num">1</div>
+        <h3>Open any long video</h3>
+        <p>No chapters? <strong>YouChop's icon lights up.</strong> It only wakes on videos that need it.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">2</div>
+        <h3>Click “Chapterize”</h3>
+        <p>AI reads the transcript and builds <strong>topic chapters in seconds</strong> — titles that say what's actually in each part.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">3</div>
+        <h3>Jump anywhere</h3>
+        <p>Chapters appear <strong>exactly where YouTube shows real ones</strong> — the seekbar and the chapter list. Click and skip.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="native">
+    <div class="kicker">Why it feels native</div>
+    <h2 class="reveal">Not a sidebar. Not a summary panel.</h2>
+    <div class="native-grid">
+      <div class="native-card them reveal">
+        <span class="tag">Every other AI tool</span>
+        <h3>A panel next to the video</h3>
+        <p>Summarizers bolt a sidebar onto the page and hand you a wall of text. You read <em>about</em> the video instead of navigating it.</p>
+      </div>
+      <div class="native-card us reveal">
+        <span class="tag">YouChop</span>
+        <h3>Chapters in YouTube's own UI</h3>
+        <p>Seekbar segments, the chapter list, hover titles — rendered where YouTube renders real chapters, so it feels like the creator added them. And any video someone already chopped <strong style="color:var(--ink)">loads instantly, free, for everyone.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="creators-band">
+    <div class="creator-band reveal">
+      <div>
+        <h3>Creator with a back-catalog full of unchaptered videos?</h3>
+        <p>Chapters pasted into your descriptions become Google-searchable <span class="price">Key Moments</span>. We'll chapter your entire back-catalog — up to 200 videos — for <span class="price">$99, once</span>. Others charge $19–39 <em>every month</em>.</p>
+      </div>
+      <a class="btn btn-amber" href="/creators">See creator pricing →</a>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="kicker">Pricing</div>
+    <h2 class="reveal">Free to start. Fair forever.</h2>
+    <p class="lede">5 free chops when you sign up — no card. Earn more by sharing, or buy a pack when you're hooked. Already-chopped videos never cost anyone a credit.</p>
+    <div class="price-grid">
+      <div class="price-card reveal">
+        <h3>What a chop costs</h3>
+        <div class="credit-row"><span>Short video <span class="muted">(under 15 min)</span></span><span class="cost">1 credit</span></div>
+        <div class="credit-row"><span>Medium <span class="muted">(15–60 min)</span></span><span class="cost">2 credits</span></div>
+        <div class="credit-row"><span>Long <span class="muted">(over an hour)</span></span><span class="cost">3 credits</span></div>
+        <div class="credit-row"><span>Already-chopped video</span><span class="earn">free · instant</span></div>
+      </div>
+      <div class="price-card reveal">
+        <h3>How you earn them</h3>
+        <div class="credit-row"><span>Sign up</span><span class="earn">+5</span></div>
+        <div class="credit-row"><span>Share chapters <span class="muted">(copy the timestamps)</span></span><span class="earn">+1</span></div>
+        <div class="credit-row"><span>Invite a friend</span><span class="earn">+10</span></div>
+        <div class="free-note"><strong>Sharing helps everyone:</strong> paste the timestamps into the comments yourself (YouChop never auto-posts anything), or send them to the creator — if they add them to the description, the whole world gets chapters.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="kicker">FAQ</div>
+    <h2 class="reveal">The questions worth asking.</h2>
+    <div class="faq" style="margin-top:44px">
+      <details>
+        <summary>Is this against YouTube's rules?</summary>
+        <p>No. YouChop renders chapters locally in your browser — nothing is posted, automated, or modified on YouTube itself. If you choose to share timestamps in a comment, you paste them yourself, manually, like any other comment. YouChop never auto-posts anything, anywhere.</p>
+      </details>
+      <details>
+        <summary>What does the extension read?</summary>
+        <p>Only the public transcript of the video you're currently watching. No browsing history, no personal data collection, minimal permissions (youtube.com only). Our privacy policy states exactly what chapter data we store and how to request deletion.</p>
+      </details>
+      <details>
+        <summary>How does the creator back-catalog service access my videos?</summary>
+        <p>With your permission, through YouTube's official API — you sign in with Google and consent to caption access for your own channel. Nothing is scraped, and you can revoke access anytime. Your chapters are delivered as editable text you paste into your descriptions: they're yours forever, even if you never use YouChop again.</p>
+      </details>
+      <details>
+        <summary>What happens when I run out of credits?</summary>
+        <p>You can earn more free (share chapters +1, invite a friend +10) or buy a pack. And any video someone has already chapterized loads instantly and never costs you a credit.</p>
+      </details>
+      <details>
+        <summary>Do the chapters appear for other people?</summary>
+        <p>Any YouChop user opening that video sees them instantly — it's already chopped and cached. Want everyone to benefit? Copy the timestamps and paste them into the comments, or send them to the creator to add to the description.</p>
+      </details>
+      <details>
+        <summary>Does it work on every video?</summary>
+        <p>It needs the video to have a transcript or captions, which almost all long-form YouTube videos do. Rare videos without any captions can't be chapterized — we'll tell you before spending a credit.</p>
+      </details>
+    </div>
+  </section>
+</div>
+
+<div class="wrap">
+  <section class="final" id="install">
+    <h2 class="reveal">That video you're avoiding because it's 2 hours with no chapters? Fix it now.</h2>
+    <div class="cta-row">
+      <a class="btn btn-red" id="install-cta-2" href="#install">Add to Chrome — it's free</a>
+    </div>
+    <p class="microcopy">5 free chops · no credit card</p>
+    <p class="microcopy" style="margin-top:6px">Creator with a back-catalog? <a href="/creators" style="color:var(--amber)">→ /creators</a></p>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <a class="wordmark" href="/" style="font-size:17px">You<span class="blade" style="height:16px"></span>Chop</a>
+      <p style="margin-top:10px">Real chapters for every YouTube video.</p>
+    </div>
+    <div class="flinks">
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/creators">For creators</a>
+      <a href="mailto:adamtpang@gmail.com">Contact</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:30px; font-family:var(--mono); font-size:11.5px">© 2026 YouChop · built by <a href="https://adampang.com">Adam Pang</a> · YouChop is not affiliated with YouTube</div>
+</footer>
+
+<script>
+/* ===== CONFIG — swap when the Chrome Web Store listing is live ===== */
+var CHROME_STORE_URL = ""; // e.g. "https://chromewebstore.google.com/detail/youchop/<id>"
+
+(function () {
+  // Install CTA: link to store when live; honest fallback until then.
+  ["install-cta", "install-cta-2"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (CHROME_STORE_URL) {
+      el.href = CHROME_STORE_URL;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+    } else {
+      el.addEventListener("click", function (e) {
+        e.preventDefault();
+        el.textContent = "Launching on the Web Store — email me for day-one access →";
+        el.href = "mailto:adamtpang@gmail.com?subject=YouChop%20early%20access";
+        el.onclick = null;
+      }, { once: true });
+    }
+  });
+
+  // Reveal on scroll
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) { if (en.isIntersecting) en.target.classList.add("in"); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+
+  /* ===== the demo: a seekbar getting chopped, on loop ===== */
+  var CHAPTERS = [
+    { t: "0:00",    nm: "Cold open — a $14B traffic jam", w: 9,  len: "12:40" },
+    { t: "12:40",   nm: "Anatomy of a container ship",    w: 17, len: "23:05" },
+    { t: "35:45",   nm: "Why ports are the bottleneck",   w: 22, len: "28:12" },
+    { t: "1:03:57", nm: "The crane operator's view",      w: 15, len: "19:48" },
+    { t: "1:23:45", nm: "Automation vs the unions",       w: 20, len: "26:30" },
+    { t: "1:50:15", nm: "What breaks next",               w: 17, len: "23:52" }
+  ];
+  var player = document.getElementById("demo");
+  var track = document.getElementById("track");
+  var list = document.getElementById("chaplist");
+  var chip = document.getElementById("chip");
+  var playhead = document.getElementById("playhead");
+  var stage = document.getElementById("stagelabel");
+  if (!player) return;
+
+  // build segments + rows
+  CHAPTERS.forEach(function (c, i) {
+    var seg = document.createElement("div");
+    seg.className = "seg"; seg.style.setProperty("--w", c.w);
+    seg.innerHTML = '<div class="fill"></div>';
+    track.appendChild(seg);
+    var row = document.createElement("div");
+    row.className = "chaprow"; row.style.transitionDelay = (i * 70) + "ms";
+    row.innerHTML = '<span class="ts">' + c.t + '</span><span class="nm">' + c.nm + '</span><span class="len">' + c.len + '</span>';
+    list.appendChild(row);
+  });
+  var rows = list.querySelectorAll(".chaprow");
+  var fills = track.querySelectorAll(".fill");
+
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function setStage(txt) { stage.textContent = txt; }
+
+  function cycle() {
+    // phase 0: reset — one grey bar
+    player.className = "player";
+    rows.forEach(function (r) { r.classList.remove("active"); });
+    fills.forEach(function (f) { f.style.width = "0%"; });
+    chip.classList.remove("show");
+    playhead.style.left = "4%";
+    setStage("a 2-hour video with no chapters");
+
+    // phase 1: press chapterize
+    setTimeout(function () {
+      player.classList.add("pressed", "thinking");
+      setStage("reading the transcript…");
+    }, 1800);
+
+    // phase 2: chop sweep
+    setTimeout(function () {
+      player.classList.remove("pressed");
+      player.classList.add("chopping");
+    }, 3200);
+
+    // phase 3: segments split + list reveals
+    setTimeout(function () {
+      player.classList.remove("thinking", "chopping");
+      player.classList.add("chopped", "listed");
+      setStage("6 chapters, built from the transcript");
+    }, 4400);
+
+    // phase 4: "click" chapter 3 — playhead jumps, chip shows
+    setTimeout(function () {
+      rows[2].classList.add("active");
+      chip.style.left = "44%";
+      chip.classList.add("show");
+      playhead.style.left = "44%";
+      player.classList.add("playing");
+      fills[2].style.transition = "width 3.5s linear";
+      fills[2].style.width = "38%";
+      setStage("jump straight to the part you came for");
+    }, 6200);
+
+    // phase 5: brief hold, then loop
+    setTimeout(function () {
+      fills[2].style.transition = "none";
+      cycle();
+    }, 11500);
+  }
+
+  if (reduced) {
+    // static final state for reduced motion
+    player.classList.add("chopped", "listed", "playing");
+    rows[2].classList.add("active");
+    playhead.style.left = "44%";
+    setStage("6 chapters, built from the transcript");
+  } else {
+    cycle();
+  }
+})();
+</script>
+</body>
+</html>

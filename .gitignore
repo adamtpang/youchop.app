@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.vercel/
+.env*
+!.env.example
+# vitals finances are real — keep local
+# vitals/vitals.data.js
