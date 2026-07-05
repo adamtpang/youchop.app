@@ -1,0 +1,16 @@
+# YouChop (youchop.app)
+
+> A Chrome extension that reads a YouTube video's transcript and renders real, clickable AI chapters right in YouTube's own player, plus a paid service that chapterizes a creator's whole back-catalog.
+
+Most long videos never get chapters, so viewers scrub blind through a two-hour podcast hunting for the one part they came for. YouChop reads the public transcript, builds topic chapters in seconds, and renders them exactly where YouTube shows real chapters: seekbar segments and the chapter list. Any video someone already chopped loads instantly and free for everyone else. It is free to start (5 chops, no card), earn more by sharing, or buy a pack.
+
+The business is creator-revenue-first. Creators can have their entire back-catalog, up to 200 videos, chaptered for $99 once, delivered as editable timestamps they paste into descriptions to become Google-searchable Key Moments. This repo is a static rebuild landing page: the extension was built historically but never published to the Chrome Web Store, and install and purchase CTAs currently degrade to a manual email flow.
+
+## Key links
+- [Home](https://youchop.app/): what YouChop is, how it works, pricing, and FAQ, with an animated demo of a seekbar getting chopped.
+- [For creators](https://youchop.app/creators): the $99 back-catalog pack, continuity option, agency SKU, and free 3-video sample offer.
+- [Vitals dashboard](https://youchop.app/vitals): the company operating dashboard with metrics, roadmap, and decisions.
+
+## About
+- Part of adam.inc, the internet portfolio of Adam Pangelinan (Anchor Marianas LLC).
+- Builder: https://adampang.com
