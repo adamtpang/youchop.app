@@ -11,6 +11,7 @@
 | Path | What |
 |---|---|
 | `index.html` + `site.css` | Landing page (static, no build). Hero contains a CSS/JS animated demo of the seekbar getting chopped. |
+| `extract.html` + `api/` | **Channel → Text** tool: pull a whole channel's transcripts as copy-paste LLM context. Two Vercel functions (`channel-videos.js`, `transcripts.js`) proxy youtube-transcript.io with the token kept server-side. Needs `YT_TRANSCRIPT_TOKEN` (see `.env.example`); runs in mock mode without one. |
 | `creators.html` | The revenue surface: $99 back-catalog pack, $12/mo continuity sub, agency SKU, free-sample mechanic. |
 | `vitals/` | The company operating dashboard (vendored from [vitals.run](https://vitals.run)). `vitals.data.js` is the single source of truth for metrics, roadmap, decisions. |
 | `vercel.json` | Clean URLs (`/creators`), deployed to the existing `youchop.app` Vercel project. |
