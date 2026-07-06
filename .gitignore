@@ -5,3 +5,5 @@ node_modules/
 !.env.example
 # vitals finances are real — keep local
 # vitals/vitals.data.js
+
+.vercel

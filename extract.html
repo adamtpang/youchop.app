@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouChop — Extract a whole YouTube channel's transcripts for your LLM</title>
+<meta name="description" content="Search any YouTube channel, pull every video's transcript, and copy-paste the whole thing into Claude, ChatGPT, or your code tool. Clean text, ready for context." />
+<meta name="keywords" content="youtube channel transcript extractor, download youtube transcripts, youtube transcript for chatgpt, feed youtube channel to claude, bulk youtube transcript export" />
+<link rel="canonical" href="https://youchop.app/extract" />
+<meta property="og:title" content="YouChop — a YouTube channel → your LLM" />
+<meta property="og:description" content="Every transcript from any channel, as clean copy-paste text for Claude, ChatGPT, or Cursor." />
+<meta property="og:url" content="https://youchop.app/extract" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://youchop.app/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="site.css" />
+</head>
+<body>
+
+<div class="glow" style="top:-200px; right:-100px; width:600px; height:500px; background:var(--red); opacity:.12"></div>
+<div class="glow" style="top:500px; left:-200px; width:500px; height:500px; background:var(--amber); opacity:.07"></div>
+
+<div class="wrap">
+  <nav>
+    <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
+    <div class="navlinks">
+      <a href="/#how">Chapters</a>
+      <a href="/extract" style="color:var(--ink)">Channel → Text</a>
+      <a href="/creators" class="creator-link">For creators →</a>
+    </div>
+  </nav>
+
+  <header class="tool-hero">
+    <div class="kicker">Channel → Text</div>
+    <h1 style="font-size:clamp(36px,5.6vw,64px); font-weight:800; letter-spacing:-.035em; line-height:1.05; max-width:18ch">
+      Feed an entire YouTube channel to your <span class="chopword">LLM</span>.
+    </h1>
+    <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:60ch; line-height:1.6">
+      Point YouChop at any channel. It pulls every video's transcript and hands you one clean block of text — ready to paste into <strong style="color:var(--ink)">Claude, ChatGPT, Cursor,</strong> or any tool with a context window.
+    </p>
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="channel" id="tab-channel">Whole channel <span class="lock" title="Requires a youtube-transcript.io Plus plan">Plus</span></button>
+      <button class="mode-tab" data-mode="paste" id="tab-paste">Paste video links</button>
+    </div>
+
+    <!-- CHANNEL MODE -->
+    <div id="mode-channel">
+      <div class="input-row">
+        <input class="tool-input" id="channel-input" placeholder="@mkbhd  ·  or  youtube.com/@lexfridman" autocomplete="off" />
+        <button class="btn btn-red" id="find-btn">Find videos</button>
+      </div>
+      <p class="input-hint">Paste a channel @handle or URL. We list the videos; you pick which ones to pull.</p>
+    </div>
+
+    <!-- PASTE MODE -->
+    <div id="mode-paste" style="display:none">
+      <textarea class="tool-input" id="paste-input" placeholder="Paste YouTube links or video IDs, one per line:&#10;https://youtube.com/watch?v=jNQXAC9IVRw&#10;https://youtu.be/dQw4w9WgXcQ&#10;kJQP7kiw5Fk"></textarea>
+      <div class="input-row" style="margin-top:12px">
+        <button class="btn btn-red" id="paste-btn">Load these videos</button>
+        <span class="input-hint" style="align-self:center; margin-top:0">Works on any plan — no channel search needed.</span>
+      </div>
+    </div>
+
+    <div class="err-box" id="err"></div>
+  </header>
+
+  <!-- VIDEO LIST -->
+  <div class="videos-panel" id="videos-panel">
+    <div class="videos-head">
+      <div class="count"><b id="sel-count">0</b> of <b id="tot-count">0</b> videos selected <span id="chan-name" class="muted"></span></div>
+      <div class="list-actions">
+        <button class="linkbtn" id="select-all">Select all</button>
+        <button class="linkbtn" id="select-none">None</button>
+        <button class="btn btn-red btn-sm" id="extract-btn">Extract transcripts →</button>
+      </div>
+    </div>
+    <div class="vlist" id="vlist"></div>
+
+    <div class="progress-wrap" id="progress">
+      <div class="pbar"><div class="pbar-fill" id="pbar-fill"></div></div>
+      <div class="pstat" id="pstat">Starting…</div>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="out-panel" id="out-panel">
+    <div class="out-bar">
+      <div class="out-stats"><b id="stat-videos">0</b> videos · <b id="stat-words">0</b> words · ~<b id="stat-tokens">0</b> tokens</div>
+      <div class="out-controls">
+        <div class="seg-toggle">
+          <button id="fmt-clean" class="on">Clean text</button>
+          <button id="fmt-ts">Timestamps</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="download-btn">Download .md</button>
+        <button class="btn btn-red btn-sm" id="copy-btn">Copy for Claude</button>
+      </div>
+    </div>
+    <div class="out-text" id="out-text"></div>
+    <p class="input-hint" id="ctx-note" style="margin-top:12px"></p>
+  </div>
+
+  <section style="padding:70px 0 40px">
+    <div class="kicker">Why</div>
+    <h2 class="reveal in">Transcripts are the fastest way to put a creator's brain in your context window.</h2>
+    <div class="steps" style="margin-top:44px">
+      <div class="step"><div class="num">1</div><h3>Research a whole channel</h3><p>Pull an expert's entire catalog and ask Claude to <strong>synthesize everything they've said</strong> on a topic.</p></div>
+      <div class="step"><div class="num">2</div><h3>Ground your code tool</h3><p>Drop a tutorial series into Cursor as <strong>reference text</strong> instead of re-watching six hours.</p></div>
+      <div class="step"><div class="num">3</div><h3>Keep the text</h3><p>Clean, delimited, timestamp-optional. <strong>Yours to paste anywhere</strong> — no re-fetching.</p></div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <a class="wordmark" href="/" style="font-size:17px">You<span class="blade" style="height:16px"></span>Chop</a>
+      <p style="margin-top:10px">Real chapters — and raw transcripts — for every YouTube video.</p>
+    </div>
+    <div class="flinks">
+      <a href="/#how">Chapters</a>
+      <a href="/extract">Channel → Text</a>
+      <a href="/creators">For creators</a>
+      <a href="mailto:adamtpang@gmail.com">Contact</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:30px; font-family:var(--mono); font-size:11.5px">© 2026 YouChop · built by <a href="https://adampang.com">Adam Pang</a> · not affiliated with YouTube</div>
+</footer>
+
+<div class="toast" id="toast">Copied</div>
+
+<script>
+(function () {
+  var USE_MOCK = false; // set true only for a keyless UI demo
+  var BATCH = 25;       // video ids per transcripts call (<=50); smaller = safer on timeouts
+  var GAP_MS = 2600;    // spacing between calls (rate limit: 5 req / 10s)
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { videos: [], transcripts: {}, format: "clean", channel: "" };
+
+  // ---- helpers ----
+  function showErr(msg, detail) {
+    var e = $("err"); e.innerHTML = msg + (detail ? ' <code>' + detail + '</code>' : "");
+    e.classList.add("show");
+  }
+  function clearErr() { $("err").classList.remove("show"); }
+  function toast(t) { var el = $("toast"); el.textContent = t; el.classList.add("show"); setTimeout(function(){ el.classList.remove("show"); }, 1400); }
+  function esc(s) { return String(s == null ? "" : s); }
+  function q(o) { return Object.keys(o).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
+
+  function parseVideoIds(text) {
+    var ids = [], seen = {};
+    (text || "").split(/[\s,]+/).forEach(function (tok) {
+      tok = tok.trim(); if (!tok) return;
+      var id = null;
+      var m = tok.match(/[?&]v=([\w-]{11})/) || tok.match(/youtu\.be\/([\w-]{11})/) || tok.match(/\/shorts\/([\w-]{11})/) || tok.match(/\/embed\/([\w-]{11})/);
+      if (m) id = m[1];
+      else if (/^[\w-]{11}$/.test(tok)) id = tok;
+      if (id && !seen[id]) { seen[id] = 1; ids.push(id); }
+    });
+    return ids;
+  }
+
+  // ---- mode tabs ----
+  var mode = "channel";
+  function setMode(m) {
+    mode = m;
+    $("tab-channel").classList.toggle("active", m === "channel");
+    $("tab-paste").classList.toggle("active", m === "paste");
+    $("mode-channel").style.display = m === "channel" ? "" : "none";
+    $("mode-paste").style.display = m === "paste" ? "" : "none";
+    clearErr();
+  }
+  $("tab-channel").onclick = function () { setMode("channel"); };
+  $("tab-paste").onclick = function () { setMode("paste"); };
+
+  // ---- render video list ----
+  function renderList() {
+    var vlist = $("vlist"); vlist.innerHTML = "";
+    state.videos.forEach(function (v, i) {
+      var row = document.createElement("label");
+      row.className = "vitem";
+      row.innerHTML =
+        '<input type="checkbox" ' + (v.selected ? "checked" : "") + ' data-i="' + i + '">' +
+        '<span class="vt">' + esc(v.title || v.videoId) + '</span>' +
+        '<span class="vmeta">' + esc(v.duration || v.published || "") + '</span>' +
+        '<span class="vstate ' + (v.state || "pend") + '" data-state="' + i + '">' + (v.state === "done" ? "✓" : v.state === "fail" ? "✕" : "") + '</span>';
+      vlist.appendChild(row);
+    });
+    vlist.querySelectorAll("input").forEach(function (cb) {
+      cb.onchange = function () { state.videos[+cb.dataset.i].selected = cb.checked; updateCount(); };
+    });
+    $("tot-count").textContent = state.videos.length;
+    updateCount();
+    $("videos-panel").classList.add("show");
+  }
+  function updateCount() { $("sel-count").textContent = state.videos.filter(function (v) { return v.selected; }).length; }
+  function setState(i, s) {
+    state.videos[i].state = s;
+    var el = document.querySelector('[data-state="' + i + '"]');
+    if (el) { el.className = "vstate " + s; el.textContent = s === "done" ? "✓" : s === "fail" ? "✕" : ""; }
+  }
+
+  $("select-all").onclick = function () { state.videos.forEach(function (v) { v.selected = true; }); renderList(); };
+  $("select-none").onclick = function () { state.videos.forEach(function (v) { v.selected = false; }); renderList(); };
+
+  // ---- find channel videos ----
+  $("find-btn").onclick = async function () {
+    clearErr();
+    var handle = $("channel-input").value.trim();
+    if (!handle) return showErr("Enter a channel @handle or URL.");
+    $("find-btn").textContent = "Finding…"; $("find-btn").disabled = true;
+    try {
+      var params = { handle: handle }; if (USE_MOCK) params.mock = "1";
+      var r = await fetch("/api/channel-videos?" + q(params));
+      var d = await r.json();
+      if (!r.ok) { showErr(errMsg(d, r.status), d.detail && JSON.stringify(d.detail).slice(0, 200)); return; }
+      if (!d.videos || !d.videos.length) return showErr("No videos found for that channel. Double-check the handle, or try Paste video links.");
+      state.channel = (d.channel && d.channel.title) || handle;
+      $("chan-name").textContent = "· " + state.channel;
+      state.videos = d.videos.map(function (v) { return { videoId: v.videoId, title: v.title, duration: v.duration, published: v.published, selected: true, state: "pend" }; });
+      renderList();
+    } catch (e) { showErr("Request failed.", String(e.message || e)); }
+    finally { $("find-btn").textContent = "Find videos"; $("find-btn").disabled = false; }
+  };
+
+  // ---- paste mode ----
+  $("paste-btn").onclick = function () {
+    clearErr();
+    var ids = parseVideoIds($("paste-input").value);
+    if (!ids.length) return showErr("No valid YouTube links or 11-character IDs found.");
+    state.channel = "Pasted list";
+    $("chan-name").textContent = "· " + ids.length + " pasted";
+    state.videos = ids.map(function (id) { return { videoId: id, title: "", selected: true, state: "pend" }; });
+    renderList();
+  };
+
+  function errMsg(d, status) {
+    if (d && d.error === "rate_limited") return "Rate limited by the transcript API — wait a moment and retry.";
+    if (status === 500 && d && /YT_TRANSCRIPT_TOKEN/.test(d.error || "")) return "The transcript API key isn't configured on the server yet.";
+    if (status === 401 || status === 403) return "The transcript API rejected the key — check the plan/token (channel search needs a Plus plan).";
+    return (d && d.error) ? ("Error: " + d.error) : "Something went wrong (" + status + ").";
+  }
+
+  // ---- extract transcripts ----
+  var extracting = false;
+  $("extract-btn").onclick = async function () {
+    if (extracting) return;
+    clearErr();
+    var selected = state.videos.map(function (v, i) { return { v: v, i: i }; }).filter(function (x) { return x.v.selected; });
+    if (!selected.length) return showErr("Select at least one video.");
+    extracting = true; $("extract-btn").disabled = true;
+    $("progress").classList.add("show");
+    var done = 0, total = selected.length;
+
+    // batch
+    var batches = [];
+    for (var k = 0; k < selected.length; k += BATCH) batches.push(selected.slice(k, k + BATCH));
+
+    for (var b = 0; b < batches.length; b++) {
+      var group = batches[b];
+      var ids = group.map(function (x) { return x.v.videoId; });
+      $("pstat").textContent = "Pulling transcripts… batch " + (b + 1) + " of " + batches.length + " (" + done + "/" + total + ")";
+      var ok = await pullBatch(ids, group);
+      done += group.length;
+      $("pbar-fill").style.width = Math.round((done / total) * 100) + "%";
+      if (b < batches.length - 1) await sleep(GAP_MS);
+    }
+    $("pstat").textContent = "Done — " + Object.keys(state.transcripts).length + " transcripts pulled.";
+    extracting = false; $("extract-btn").disabled = false;
+    render();
+  };
+
+  async function pullBatch(ids, group, retries) {
+    retries = retries || 0;
+    try {
+      var body = { ids: ids, timestamps: false }; if (USE_MOCK) body.mock = true;
+      var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (r.status === 429) {
+        var d0 = await r.json().catch(function(){return{};});
+        if (retries < 4) { await sleep(((d0.retryAfter || 10)) * 1000); return pullBatch(ids, group, retries + 1); }
+      }
+      var d = await r.json();
+      if (!r.ok) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr(errMsg(d, r.status)); return false; }
+      var byId = {};
+      (d.transcripts || []).forEach(function (t) { byId[t.videoId] = t; });
+      group.forEach(function (x) {
+        var t = byId[x.v.videoId];
+        if (t && t.ok) {
+          state.transcripts[x.v.videoId] = t;
+          if (!x.v.title && t.title) { x.v.title = t.title; }
+          setState(x.i, "done");
+        } else { setState(x.i, "fail"); }
+      });
+      return true;
+    } catch (e) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr("Batch failed.", String(e.message || e)); return false; }
+  }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // ---- build output ----
+  function orderedTranscripts() {
+    return state.videos.map(function (v) { return state.transcripts[v.videoId]; }).filter(Boolean);
+  }
+  function buildText(withTs) {
+    var ts = orderedTranscripts();
+    var head = "# Transcripts from " + (state.channel || "YouTube") + " (" + ts.length + " videos)\n" +
+      "# Pulled with youchop.app — each video delimited by ====\n\n";
+    var body = ts.map(function (t) {
+      var text = withTs ? (t.textTs || t.text) : t.text;
+      return "==== " + (t.title || t.videoId) + " ====\n" +
+        "https://youtube.com/watch?v=" + t.videoId + (t.author ? "  ·  " + t.author : "") + "\n\n" +
+        (text || "(no transcript available)") + "\n";
+    }).join("\n");
+    return head + body;
+  }
+
+  // When user flips to timestamps, we need the timestamped variant. Re-fetch lazily.
+  async function ensureTimestamps() {
+    var need = orderedTranscripts().filter(function (t) { return !t.textTs; }).map(function (t) { return t.videoId; });
+    if (!need.length) return;
+    $("pstat").textContent = "Adding timestamps…"; $("progress").classList.add("show");
+    for (var k = 0; k < need.length; k += BATCH) {
+      var ids = need.slice(k, k + BATCH);
+      try {
+        var body = { ids: ids, timestamps: true }; if (USE_MOCK) body.mock = true;
+        var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        var d = await r.json();
+        (d.transcripts || []).forEach(function (t) { if (state.transcripts[t.videoId]) state.transcripts[t.videoId].textTs = t.text; });
+      } catch (e) {}
+      if (k + BATCH < need.length) await sleep(GAP_MS);
+    }
+    $("progress").classList.remove("show");
+  }
+
+  function render() {
+    var ts = orderedTranscripts();
+    if (!ts.length) return;
+    var text = buildText(state.format === "ts");
+    $("out-text").textContent = text;
+    var words = (text.trim().match(/\S+/g) || []).length;
+    var tokens = Math.round(text.length / 4);
+    $("stat-videos").textContent = ts.length;
+    $("stat-words").textContent = words.toLocaleString();
+    $("stat-tokens").textContent = tokens.toLocaleString();
+    $("ctx-note").textContent = tokens > 190000
+      ? "⚠ ~" + tokens.toLocaleString() + " tokens — bigger than a 200K context window. Paste fewer videos, or split it."
+      : "Fits comfortably in a 200K-token context window. Paste the whole thing.";
+    $("out-panel").classList.add("show");
+    $("out-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  $("fmt-clean").onclick = function () { state.format = "clean"; $("fmt-clean").classList.add("on"); $("fmt-ts").classList.remove("on"); render(); };
+  $("fmt-ts").onclick = async function () { state.format = "ts"; $("fmt-ts").classList.add("on"); $("fmt-clean").classList.remove("on"); await ensureTimestamps(); render(); };
+
+  $("copy-btn").onclick = async function () {
+    try { await navigator.clipboard.writeText($("out-text").textContent); toast("Copied — paste into Claude"); }
+    catch (e) {
+      var r = document.createRange(); r.selectNode($("out-text"));
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      try { document.execCommand("copy"); toast("Copied"); } catch (e2) { toast("Press Ctrl+C"); }
+    }
+  };
+  $("download-btn").onclick = function () {
+    var blob = new Blob([$("out-text").textContent], { type: "text/markdown" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (state.channel || "youchop").replace(/[^\w@-]+/g, "_") + "-transcripts.md";
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+})();
+</script>
+</body>
+</html>

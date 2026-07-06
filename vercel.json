@@ -4,5 +4,8 @@
   "framework": null,
   "installCommand": "",
   "buildCommand": "",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "functions": {
+    "api/*.js": { "maxDuration": 60 }
+  }
 }
