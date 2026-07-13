@@ -1,3 +1,58 @@
+<!-- BEGIN:claude-chat-continuation -->
+# Continue From Claude Chats
+
+Claude Code transcripts for this project have been indexed for Codex in `CODEX_CONTINUE_FROM_CLAUDE.md`. Read that file when the user asks to continue work from Claude, resume a Claude session, or understand what Claude already tried.
+<!-- END:claude-chat-continuation -->
+
+<!-- BEGIN:claude-codex-sync -->
+# Claude/Codex sync
+
+Before making changes, read `CLAUDE.md` in this project if it exists. It is the live handoff from Claude Code and the source of truth for current project progress, design decisions, constraints, and open tasks. Keep future progress updates there so Claude and Codex stay in sync.
+
+If this file contains older project context that conflicts with `CLAUDE.md`, prefer `CLAUDE.md` unless the user says otherwise.
+<!-- END:claude-codex-sync -->
+
+<!-- BEGIN:imported-claude-context -->
+# Imported Claude context
+
+Copied from `CLAUDE.md` on 2026-07-08 so Codex starts with the same project context Claude Code used. Keep `CLAUDE.md` as the source of truth and refresh this block after meaningful Claude-side progress.
+
+<!-- SOURCE: CLAUDE.md -->
+
+# CLAUDE.md - youchop.app
+
+Context for Claude Code, Codex, and humans working in this folder.
+
+## What this is
+
+This handoff was generated on 2026-07-07 so every top-level Codex project under
+`C:\Users\adamp\OneDrive\Aether` has both `CLAUDE.md` and `AGENTS.md`.
+
+No richer Claude handoff was found here during the workspace sync. Treat this file
+as a starting point, then inspect the actual code and docs before making changes.
+
+## Detected project facts
+
+- Workspace folder: `youchop.app`
+- Git repository: yes
+- `package.json`: no
+- Detected stack: static HTML
+- Existing context-like files: README.md, readme.md, llms.txt
+- Notable top-level files: .env.example, .gitignore, creators.html, ECONOMICS.md, extract.html, GROWTH.md, index.html, llms.txt, README.md, site.css, STRATEGY.md, vercel.json
+
+## How to keep this useful
+
+- If you learn the product purpose, stack, run commands, deployment target, or open
+  tasks, update this file.
+- Keep `AGENTS.md` synchronized with this file so Codex sessions have the same
+  context inline.
+- Prefer concrete project facts over generic instructions.
+
+## Imported existing context
+
+Source: `README.md`
+
+```markdown
 # YouChop
 
 **Real chapters for every YouTube video.** A Chrome extension that reads a video's transcript and renders AI-generated, clickable chapters in YouTube's own player UI (seekbar segments + chapter list) — plus a creator service that chapterizes entire back-catalogs.
@@ -11,7 +66,7 @@
 | Path | What |
 |---|---|
 | `index.html` + `site.css` | Landing page (static, no build). Hero contains a CSS/JS animated demo of the seekbar getting chopped. |
-| `extract.html` + `api/` | **Channel → Text** tool: search any channel, pull every video's transcript as copy-paste LLM context. Three Vercel functions — `channel-search.js` + `channel-videos.js` (free **YouTube Data API v3**, `YT_DATA_API_KEY`) and `transcripts.js` (pluggable: **Apify** free tier `APIFY_TOKEN` by default, `youtube-transcript.io` as paid fallback). All keys are free; see `.env.example`. Runs in mock mode without any key. |
+| `extract.html` + `api/` | **Channel → Text** tool: pull a whole channel's transcripts as copy-paste LLM context. Two Vercel functions (`channel-videos.js`, `transcripts.js`) proxy youtube-transcript.io with the token kept server-side. Needs `YT_TRANSCRIPT_TOKEN` (see `.env.example`); runs in mock mode without one. |
 | `creators.html` | The revenue surface: $99 back-catalog pack, $12/mo continuity sub, agency SKU, free-sample mechanic. |
 | `vitals/` | The company operating dashboard (vendored from [vitals.run](https://vitals.run)). `vitals.data.js` is the single source of truth for metrics, roadmap, decisions. |
 | `vercel.json` | Clean URLs (`/creators`), deployed to the existing `youchop.app` Vercel project. |
@@ -39,3 +94,5 @@ Open a Claude session in this repo and say: `log this week` · `check off <miles
 vercel --prod --scope adamtpangs-projects
 ```
 The Vercel project `youchop.app` (`prj_wdbsn1IIESiWsAPGIw8JQDGf3Gz7`) already owns the domain. Note: deploying replaces the old Next.js app (including its `/credits` page).
+```
+<!-- END:imported-claude-context -->

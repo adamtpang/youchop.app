@@ -404,6 +404,21 @@ footer .flinks { display: flex; gap: 22px; }
 textarea.tool-input { resize: vertical; min-height: 120px; line-height: 1.6; width: 100%; }
 .input-hint { font-family: var(--mono); font-size: 12px; color: var(--mut); margin-top: 10px; }
 
+/* channel search results */
+.chan-results { margin-top: 16px; display: none; gap: 10px; grid-template-columns: 1fr; }
+.chan-results.show { display: grid; }
+.chan-card {
+  display: flex; gap: 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--panel); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.chan-card:hover { border-color: var(--red); background: var(--panel2); }
+.chan-card img { width: 46px; height: 46px; border-radius: 99px; flex-shrink: 0; background: var(--panel2); object-fit: cover; }
+.chan-card .avatar-fallback { width: 46px; height: 46px; border-radius: 99px; flex-shrink: 0; background: var(--red-dim); display: grid; place-items: center; font-family: var(--disp); font-weight: 800; color: var(--red); font-size: 18px; }
+.chan-card .cinfo { overflow: hidden; }
+.chan-card .cttl { font-weight: 700; font-size: 15px; }
+.chan-card .cdesc { font-size: 12.5px; color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60ch; }
+.chan-card .cgo { margin-left: auto; color: var(--amber); font-family: var(--mono); font-size: 12px; flex-shrink: 0; }
+
 /* video list */
 .videos-panel { margin-top: 28px; display: none; }
 .videos-panel.show { display: block; }

@@ -43,17 +43,18 @@
     </p>
 
     <div class="mode-tabs">
-      <button class="mode-tab active" data-mode="channel" id="tab-channel">Whole channel <span class="lock" title="Requires a youtube-transcript.io Plus plan">Plus</span></button>
+      <button class="mode-tab active" data-mode="channel" id="tab-channel">Search a channel</button>
       <button class="mode-tab" data-mode="paste" id="tab-paste">Paste video links</button>
     </div>
 
     <!-- CHANNEL MODE -->
     <div id="mode-channel">
       <div class="input-row">
-        <input class="tool-input" id="channel-input" placeholder="@mkbhd  ·  or  youtube.com/@lexfridman" autocomplete="off" />
-        <button class="btn btn-red" id="find-btn">Find videos</button>
+        <input class="tool-input" id="channel-input" placeholder="Search by name — “Veritasium” — or paste @handle / channel URL" autocomplete="off" />
+        <button class="btn btn-red" id="find-btn">Search</button>
       </div>
-      <p class="input-hint">Paste a channel @handle or URL. We list the videos; you pick which ones to pull.</p>
+      <p class="input-hint">Type a channel name and pick it, or paste an @handle / URL to jump straight to its videos.</p>
+      <div class="chan-results" id="chan-results"></div>
     </div>
 
     <!-- PASTE MODE -->
@@ -135,8 +136,8 @@
 <script>
 (function () {
   var USE_MOCK = false; // set true only for a keyless UI demo
-  var BATCH = 25;       // video ids per transcripts call (<=50); smaller = safer on timeouts
-  var GAP_MS = 2600;    // spacing between calls (rate limit: 5 req / 10s)
+  var BATCH = 15;       // video ids per transcripts call; small enough to finish inside the 60s function limit
+  var GAP_MS = 1200;    // spacing between batches
 
   var $ = function (id) { return document.getElementById(id); };
   var state = { videos: [], transcripts: {}, format: "clean", channel: "" };
@@ -207,25 +208,59 @@
   $("select-all").onclick = function () { state.videos.forEach(function (v) { v.selected = true; }); renderList(); };
   $("select-none").onclick = function () { state.videos.forEach(function (v) { v.selected = false; }); renderList(); };
 
-  // ---- find channel videos ----
+  // ---- channel search -> pick -> list ----
+  function escAttr(s) { return String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+  function renderChannels(cands) {
+    var box = $("chan-results");
+    box.innerHTML = cands.map(function (c, i) {
+      var av = c.thumb ? '<img src="' + escAttr(c.thumb) + '" alt="">' : '<div class="avatar-fallback">' + esc((c.title || "?").slice(0, 1).toUpperCase()) + '</div>';
+      return '<div class="chan-card" data-i="' + i + '">' + av +
+        '<div class="cinfo"><div class="cttl">' + esc(c.title) + '</div><div class="cdesc">' + esc(c.description || "") + '</div></div>' +
+        '<span class="cgo">list videos →</span></div>';
+    }).join("");
+    box.classList.add("show");
+    box.querySelectorAll(".chan-card").forEach(function (el) { el.onclick = function () { loadChannelVideos(cands[+el.dataset.i]); }; });
+  }
+
   $("find-btn").onclick = async function () {
     clearErr();
-    var handle = $("channel-input").value.trim();
-    if (!handle) return showErr("Enter a channel @handle or URL.");
-    $("find-btn").textContent = "Finding…"; $("find-btn").disabled = true;
+    var qv = $("channel-input").value.trim();
+    if (!qv) return showErr("Type a channel name, or paste an @handle / URL.");
+    $("find-btn").textContent = "Searching…"; $("find-btn").disabled = true;
+    $("chan-results").classList.remove("show");
     try {
-      var params = { handle: handle }; if (USE_MOCK) params.mock = "1";
+      var params = { q: qv }; if (USE_MOCK) params.mock = "1";
+      var r = await fetch("/api/channel-search?" + q(params));
+      var d = await r.json();
+      if (!r.ok) { showErr(errMsg(d, r.status), d.detail && JSON.stringify(d.detail).slice(0, 160)); return; }
+      var cands = d.candidates || [];
+      if (!cands.length) return showErr("No channels matched “" + qv + "”. Try the exact name, or paste the channel URL.");
+      if (cands.length === 1) loadChannelVideos(cands[0]);
+      else renderChannels(cands);
+    } catch (e) { showErr("Search failed.", String(e.message || e)); }
+    finally { $("find-btn").textContent = "Search"; $("find-btn").disabled = false; }
+  };
+  $("channel-input").addEventListener("keydown", function (e) { if (e.key === "Enter") $("find-btn").click(); });
+
+  async function loadChannelVideos(cand) {
+    clearErr();
+    $("chan-results").classList.remove("show");
+    $("videos-panel").classList.add("show");
+    $("vlist").innerHTML = '<div class="pstat" style="padding:20px">Loading videos from ' + esc(cand.title) + '…</div>';
+    try {
+      var params = cand.channelId ? { channelId: cand.channelId } : { handle: cand.title };
+      if (USE_MOCK) params.mock = "1";
       var r = await fetch("/api/channel-videos?" + q(params));
       var d = await r.json();
-      if (!r.ok) { showErr(errMsg(d, r.status), d.detail && JSON.stringify(d.detail).slice(0, 200)); return; }
-      if (!d.videos || !d.videos.length) return showErr("No videos found for that channel. Double-check the handle, or try Paste video links.");
-      state.channel = (d.channel && d.channel.title) || handle;
-      $("chan-name").textContent = "· " + state.channel;
-      state.videos = d.videos.map(function (v) { return { videoId: v.videoId, title: v.title, duration: v.duration, published: v.published, selected: true, state: "pend" }; });
+      if (!r.ok) { $("videos-panel").classList.remove("show"); showErr(errMsg(d, r.status), d.message || ""); return; }
+      if (!d.videos || !d.videos.length) { $("videos-panel").classList.remove("show"); return showErr("That channel has no listable videos."); }
+      state.channel = (d.channel && d.channel.title) || cand.title;
+      $("chan-name").textContent = "· " + state.channel + (d.truncated ? " (first " + d.videos.length + ")" : "");
+      state.transcripts = {};
+      state.videos = d.videos.map(function (v) { return { videoId: v.videoId, title: v.title, published: v.published, selected: true, state: "pend" }; });
       renderList();
-    } catch (e) { showErr("Request failed.", String(e.message || e)); }
-    finally { $("find-btn").textContent = "Find videos"; $("find-btn").disabled = false; }
-  };
+    } catch (e) { $("videos-panel").classList.remove("show"); showErr("Request failed.", String(e.message || e)); }
+  }
 
   // ---- paste mode ----
   $("paste-btn").onclick = function () {
@@ -239,10 +274,15 @@
   };
 
   function errMsg(d, status) {
-    if (d && d.error === "rate_limited") return "Rate limited by the transcript API — wait a moment and retry.";
-    if (status === 500 && d && /YT_TRANSCRIPT_TOKEN/.test(d.error || "")) return "The transcript API key isn't configured on the server yet.";
-    if (status === 401 || status === 403) return "The transcript API rejected the key — check the plan/token (channel search needs a Plus plan).";
-    return (d && d.error) ? ("Error: " + d.error) : "Something went wrong (" + status + ").";
+    var e = d && d.error;
+    if (e === "no_data_key") return "Channel search isn't wired up yet — the server needs a free YouTube Data API key (YT_DATA_API_KEY). You can still use Paste video links.";
+    if (e === "quota_exceeded") return "YouTube Data API daily quota is used up (resets midnight Pacific). Try again tomorrow, or use Paste video links.";
+    if (e === "channel_not_found" || e === "no_uploads") return "Couldn't find that channel's videos. Try the exact @handle or the channel URL.";
+    if (e === "no_apify_token" || e === "no_ytio_token" || e === "no_provider") return "The transcript backend isn't configured yet — set a free Apify token (APIFY_TOKEN) in the server env.";
+    if (e === "apify_error" && status === 402) return "Apify credits are exhausted this month. Add credits, or wait for the free tier to reset.";
+    if (e === "rate_limited") return "Rate limited — waiting a moment and retrying automatically.";
+    if (status === 401 || status === 403) return "The API rejected the key — double-check it.";
+    return (d && (d.message || d.error)) ? ("Error: " + (d.message || d.error)) : ("Something went wrong (" + status + ").");
   }
 
   // ---- extract transcripts ----
