@@ -114,6 +114,18 @@
     <p class="input-hint" id="ctx-note" style="margin-top:12px"></p>
   </div>
 
+  <!-- HISTORY -->
+  <section id="history-section" style="display:none; padding:60px 0 0">
+    <div class="kicker">History</div>
+    <div class="videos-head">
+      <div class="count"><b id="hist-count">0</b> <span id="hist-label">extractions</span> <span class="muted">· stored locally in your browser</span></div>
+      <div class="list-actions">
+        <button class="linkbtn danger" id="hist-clear">Clear all</button>
+      </div>
+    </div>
+    <div class="hist-grid" id="hist-grid"></div>
+  </section>
+
   <section style="padding:70px 0 40px">
     <div class="kicker">Why</div>
     <h2 class="reveal in">Transcripts are the fastest way to put a creator's brain in your context window.</h2>
@@ -302,7 +314,7 @@
     $("pbar-fill").style.width = "100%";
     setTimeout(function () { $("progress").classList.remove("show"); $("pbar-fill").style.width = "0%"; }, 400);
     $("single-btn").textContent = "Get transcript"; $("single-btn").disabled = false;
-    if (state.transcripts[id]) render();
+    if (state.transcripts[id]) { render(); histSave(); }
     else if (okB) showErr("No transcript available for that video — it may have captions disabled.");
   };
   $("single-input").addEventListener("keydown", function (e) { if (e.key === "Enter") $("single-btn").click(); });
@@ -346,6 +358,7 @@
     $("pstat").textContent = "Done — " + Object.keys(state.transcripts).length + " transcripts pulled.";
     extracting = false; $("extract-btn").disabled = false;
     render();
+    histSave();
   };
 
   async function pullBatch(ids, group, retries) {
@@ -437,6 +450,104 @@
 
   $("fmt-clean").onclick = function () { state.format = "clean"; $("fmt-clean").classList.add("on"); $("fmt-ts").classList.remove("on"); render(); };
   $("fmt-ts").onclick = async function () { state.format = "ts"; $("fmt-ts").classList.add("on"); $("fmt-clean").classList.remove("on"); await ensureTimestamps(); render(); };
+
+  /* ===== extraction history (localStorage, private to this browser) ===== */
+  var HKEY = "youchop_history_v1";
+  function histLoad() { try { return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch (e) { return []; } }
+  function histWrite(list) {
+    // keep under browser quota: cap entries, then shrink until it fits
+    while (list.length > 30) list.pop();
+    for (;;) {
+      try { localStorage.setItem(HKEY, JSON.stringify(list)); return; }
+      catch (e) { if (!list.length) return; list.pop(); }
+    }
+  }
+  function histSave() {
+    var ts = orderedTranscripts();
+    if (!ts.length) return;
+    var first = ts[0];
+    var text = buildText(false);
+    var entry = {
+      id: Date.now(),
+      sig: ts.map(function (t) { return t.videoId; }).join(","),
+      channel: state.channel || "",
+      count: ts.length,
+      videoId: first.videoId,
+      title: ts.length === 1 ? (first.title || first.videoId) : ((state.channel || "Channel") + " — " + ts.length + " videos"),
+      author: first.author || "",
+      tokens: Math.round(text.length / 4),
+      when: Date.now(),
+      text: text,
+    };
+    var list = histLoad().filter(function (h) { return h.sig !== entry.sig; });
+    list.unshift(entry);
+    histWrite(list);
+    histRender();
+  }
+  function fmtWhen(ms) {
+    var d = new Date(ms), now = Date.now(), diff = now - ms;
+    if (diff < 3600e3) return Math.max(1, Math.round(diff / 60e3)) + "m ago";
+    if (diff < 86400e3) return Math.round(diff / 3600e3) + "h ago";
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  function histRender() {
+    var list = histLoad();
+    var sec = $("history-section");
+    if (!list.length) { sec.style.display = "none"; return; }
+    sec.style.display = "";
+    $("hist-count").textContent = list.length;
+    $("hist-label").textContent = list.length === 1 ? "extraction" : "extractions";
+    var grid = $("hist-grid"); grid.innerHTML = "";
+    list.forEach(function (h) {
+      var card = document.createElement("div");
+      card.className = "hist-card";
+      card.innerHTML =
+        '<div class="hist-embed" data-vid="' + esc(h.videoId) + '">' +
+          '<img loading="lazy" src="https://i.ytimg.com/vi/' + esc(h.videoId) + '/hqdefault.jpg" alt="">' +
+          '<div class="playbadge"><span></span></div>' +
+          (h.count > 1 ? '<div class="multi-badge">' + h.count + " videos</div>" : "") +
+        "</div>" +
+        '<div class="hist-info">' +
+          '<div class="hist-title">' + esc(h.title) + "</div>" +
+          '<div class="hist-meta">' + esc(h.author || h.channel || "") + (h.author || h.channel ? " · " : "") + "~" + Number(h.tokens).toLocaleString() + " tokens · " + fmtWhen(h.when) + "</div>" +
+          '<div class="hist-actions">' +
+            '<button class="btn btn-red btn-sm" data-act="copy">Copy</button>' +
+            '<button class="btn btn-ghost btn-sm" data-act="view">View</button>' +
+            '<a class="linkbtn" target="_blank" rel="noopener" href="https://youtube.com/watch?v=' + esc(h.videoId) + '">YouTube ↗</a>' +
+            '<button class="linkbtn danger" data-act="del">Delete</button>' +
+          "</div>" +
+        "</div>";
+      // click-to-play embed (privacy-friendly facade)
+      card.querySelector(".hist-embed").onclick = function () {
+        this.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + esc(h.videoId) + '?autoplay=1" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+      };
+      card.querySelector('[data-act="copy"]').onclick = async function () {
+        try { await navigator.clipboard.writeText(h.text); toast("Copied — paste into Claude"); }
+        catch (e) { toast("Copy blocked — use View then Ctrl+C"); }
+      };
+      card.querySelector('[data-act="view"]').onclick = function () {
+        $("out-text").textContent = h.text;
+        var words = (h.text.trim().match(/\S+/g) || []).length;
+        $("stat-videos").textContent = h.count;
+        $("stat-vlabel").textContent = h.count === 1 ? "video" : "videos";
+        $("stat-words").textContent = words.toLocaleString();
+        $("stat-tokens").textContent = Number(h.tokens).toLocaleString();
+        $("ctx-note").textContent = "Loaded from history (" + fmtWhen(h.when) + ").";
+        $("out-panel").classList.add("show");
+        $("out-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+      card.querySelector('[data-act="del"]').onclick = function () {
+        histWrite(histLoad().filter(function (x) { return x.id !== h.id; }));
+        histRender();
+      };
+      grid.appendChild(card);
+    });
+  }
+  $("hist-clear").onclick = function () {
+    if (!window.confirm("Delete all stored extractions? This only affects this browser.")) return;
+    histWrite([]); histRender();
+  };
+  histRender();
 
   $("copy-btn").onclick = async function () {
     try { await navigator.clipboard.writeText($("out-text").textContent); toast("Copied — paste into Claude"); }

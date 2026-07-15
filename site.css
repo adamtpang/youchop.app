@@ -475,6 +475,42 @@ textarea.tool-input { resize: vertical; min-height: 120px; line-height: 1.6; wid
   padding: 18px 20px; color: var(--ink); font-family: var(--mono); font-size: 13px;
   line-height: 1.7; white-space: pre-wrap; word-break: break-word;
 }
+/* extraction history */
+.hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-top: 18px; }
+.hist-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.hist-embed { position: relative; aspect-ratio: 16/9; background: var(--panel2); cursor: pointer; }
+.hist-embed img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hist-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
+.hist-embed .playbadge {
+  position: absolute; inset: 0; display: grid; place-items: center; transition: background .2s;
+}
+.hist-embed .playbadge span {
+  width: 54px; height: 38px; background: #000000b0; border-radius: 10px;
+  display: grid; place-items: center; transition: background .2s;
+}
+.hist-embed .playbadge span::after {
+  content: ""; border-left: 14px solid #fff; border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent; margin-left: 3px;
+}
+.hist-embed:hover .playbadge span { background: var(--red); }
+.hist-embed .multi-badge {
+  position: absolute; top: 10px; right: 10px; font-family: var(--mono); font-size: 11px;
+  background: #000000c8; padding: 4px 9px; border-radius: 6px; color: var(--amber);
+}
+.hist-info { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.hist-title {
+  font-weight: 700; font-size: 14.5px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hist-meta { font-family: var(--mono); font-size: 11.5px; color: var(--mut); }
+.hist-actions { display: flex; gap: 8px; align-items: center; margin-top: auto; flex-wrap: wrap; }
+.hist-actions .btn-sm { padding: 8px 14px; font-size: 13px; }
+.linkbtn.danger { color: var(--mut); }
+.linkbtn.danger:hover { color: var(--red); }
+
 .toast {
   position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(20px);
   background: var(--ink); color: var(--bg); font-weight: 700; font-size: 14px;
