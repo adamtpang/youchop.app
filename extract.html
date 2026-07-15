@@ -312,8 +312,8 @@
     if (e === "no_data_key") return "Channel search isn't wired up yet — the server needs a free YouTube Data API key (YT_DATA_API_KEY). You can still use Paste video links.";
     if (e === "quota_exceeded") return "YouTube Data API daily quota is used up (resets midnight Pacific). Try again tomorrow, or use Paste video links.";
     if (e === "channel_not_found" || e === "no_uploads") return "Couldn't find that channel's videos. Try the exact @handle or the channel URL.";
-    if (e === "no_apify_token" || e === "no_ytio_token" || e === "no_provider") return "The transcript backend isn't configured yet — set a free Apify token (APIFY_TOKEN) in the server env.";
-    if (e === "apify_error" && status === 402) return "Apify credits are exhausted this month. Add credits, or wait for the free tier to reset.";
+    if (e === "no_apify_token" || e === "no_supadata_key" || e === "no_ytio_token" || e === "no_provider") return "The transcript backend isn't configured yet — set a free key in the server env (APIFY_TOKEN or SUPADATA_API_KEY).";
+    if ((e === "apify_error" || e === "supadata_error") && (status === 402 || status === 403)) return "The transcript provider's monthly credits are exhausted — add the other free provider key, or wait for the reset.";
     if (e === "rate_limited") return "Rate limited — waiting a moment and retrying automatically.";
     if (status === 401 || status === 403) return "The API rejected the key — double-check it.";
     return (d && (d.message || d.error)) ? ("Error: " + (d.message || d.error)) : ("Something went wrong (" + status + ").");

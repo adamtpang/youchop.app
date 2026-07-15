@@ -1,12 +1,18 @@
 // POST /api/transcripts  { ids: [videoId,...], timestamps?, mock?, debug? }
-// Pluggable transcript backend. Provider is chosen by env:
-//   TRANSCRIPT_PROVIDER = "apify" | "ytio"   (or auto-detected from whichever key exists)
-//   - apify: runs a YouTube-transcript Actor on Apify (free tier). Needs APIFY_TOKEN.
-//            Actor defaults to karamelo/youtube-transcripts; override APIFY_TRANSCRIPT_ACTOR.
-//            Apify runs the scrape on their infra (residential-grade), so it survives
-//            YouTube's datacenter-IP blocking that kills direct scraping on Vercel.
-//   - ytio: youtube-transcript.io (paid). Needs YT_TRANSCRIPT_TOKEN.
-// Batches are capped at 50 ids. Mock mode needs no key.
+// Pluggable transcript backends with automatic fallback:
+//   TRANSCRIPT_PROVIDER = "apify" | "supadata" | "ytio"  forces one provider;
+//   otherwise every configured provider is tried in order apify -> supadata -> ytio
+//   (a provider that errors — e.g. monthly credits exhausted — falls through to the next).
+//   - apify:    APIFY_TOKEN (free $5/mo credits). Actor runs on Apify's infra, which
+//               survives YouTube's datacenter-IP blocking that kills scraping on Vercel.
+//               Actor: karamelo/youtube-transcripts (override APIFY_TRANSCRIPT_ACTOR).
+//               Verified output shape: { videoId, captions, channelName? } where captions
+//               is a string (singleStringText), [{start,end,text}] (textWithTimestamps),
+//               or [string] (captions).
+//   - supadata: SUPADATA_API_KEY (free 100 transcripts/mo, no card). One request per video:
+//               GET api.supadata.ai/v1/transcript?url=…  (x-api-key header).
+//   - ytio:     YT_TRANSCRIPT_TOKEN — youtube-transcript.io (paid, optional).
+// Batches capped at 50 ids. Mock mode needs no key.
 
 const YTIO_BASE = "https://www.youtube-transcript.io/api";
 const APIFY_ACTOR = process.env.APIFY_TRANSCRIPT_ACTOR || "karamelo~youtube-transcripts";
@@ -34,18 +40,20 @@ function vidFromUrl(u) {
 
 /* ---------- provider: apify ---------- */
 function extractApifyText(item, withTs) {
-  // try known/likely fields, then fall back to the longest string on the object
-  const direct = item.singleStringText || item.transcriptText || item.transcript || item.text || item.captions || item.content;
+  const direct = item.singleStringText || item.transcriptText || item.text || item.content;
   if (typeof direct === "string" && direct.trim()) return direct.trim();
-  // array-of-segments shapes
-  const segs = item.transcript || item.captions || item.segments;
-  if (Array.isArray(segs)) {
+  if (typeof item.captions === "string" && item.captions.trim()) return item.captions.trim();
+  if (typeof item.transcript === "string" && item.transcript.trim()) return item.transcript.trim();
+  const segs = item.captions || item.transcript || item.segments;
+  if (Array.isArray(segs) && segs.length) {
+    if (typeof segs[0] === "string") {
+      return segs.map((s) => String(s).replace(/\s+/g, " ").trim()).filter(Boolean).join(" ");
+    }
     return segs.map((s) => {
       const t = String(s.text || s.caption || "").replace(/\s+/g, " ").trim();
       return withTs && (s.start != null || s.offset != null) ? "[" + hms(s.start ?? s.offset) + "] " + t : t;
     }).filter(Boolean).join(withTs ? "\n" : " ");
   }
-  // last resort: the longest string value on the item
   let best = "";
   for (const k of Object.keys(item)) if (typeof item[k] === "string" && item[k].length > best.length) best = item[k];
   return best.trim();
@@ -56,15 +64,15 @@ function normalizeApify(items, ids, withTs) {
   arr.forEach((it) => {
     const id = it.videoId || it.id || vidFromUrl(it.url || it.videoUrl || it.link || it.video_url);
     if (!id) return;
+    const text = extractApifyText(it, withTs);
     byId[id] = {
       videoId: id,
       title: it.title || it.videoTitle || "",
       author: it.channelName || it.author || it.channel || "",
       language: it.language || "",
-      ok: false, text: "",
+      ok: !!(text && text.length),
+      text,
     };
-    const text = extractApifyText(it, withTs);
-    byId[id].text = text; byId[id].ok = !!(text && text.length);
   });
   return ids.map((id) => byId[id] || { videoId: id, title: "", author: "", ok: false, text: "" });
 }
@@ -80,10 +88,54 @@ async function viaApify(ids, withTs, debug) {
   };
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
   const data = await r.json().catch(() => null);
-  if (!r.ok) return { error: { status: r.status === 402 ? 402 : r.status, body: { error: "apify_error", status: r.status, detail: data } } };
+  if (!r.ok) {
+    const msg = data && (data.error && data.error.message || data.message) || "";
+    const limitHit = r.status === 402 || /limit exceeded|payment/i.test(String(msg));
+    return { error: { status: limitHit ? 402 : r.status, body: { error: "apify_error", status: r.status, detail: msg || data } } };
+  }
   const out = { transcripts: normalizeApify(data, ids, withTs) };
   if (debug) out.raw = data;
   return out;
+}
+
+/* ---------- provider: supadata (free 100/mo) ---------- */
+function normalizeSupadata(id, data, withTs) {
+  if (!data) return { videoId: id, title: "", author: "", ok: false, text: "" };
+  let text = "";
+  if (typeof data.content === "string") text = data.content.trim();
+  else if (Array.isArray(data.content)) {
+    text = data.content.map((s) => {
+      const t = String(s.text || "").replace(/\s+/g, " ").trim();
+      return withTs && s.offset != null ? "[" + hms(Math.floor(Number(s.offset) / 1000)) + "] " + t : t;
+    }).filter(Boolean).join(withTs ? "\n" : " ");
+  }
+  return { videoId: id, title: "", author: "", language: data.lang || "", ok: !!text, text };
+}
+async function viaSupadata(ids, withTs, debug) {
+  const key = process.env.SUPADATA_API_KEY;
+  if (!key) return { error: { status: 500, body: { error: "no_supadata_key", message: "Server is missing SUPADATA_API_KEY (free tier)." } } };
+  const results = [];
+  let hardError = null;
+  const CONC = 4;
+  for (let i = 0; i < ids.length && !hardError; i += CONC) {
+    const group = ids.slice(i, i + CONC);
+    const settled = await Promise.all(group.map(async (id) => {
+      const qs = "url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + id) + (withTs ? "" : "&text=true");
+      let r = await fetch("https://api.supadata.ai/v1/transcript?" + qs, { headers: { "x-api-key": key } });
+      if (r.status === 429) { // one retry after backoff
+        await new Promise((z) => setTimeout(z, 2200));
+        r = await fetch("https://api.supadata.ai/v1/transcript?" + qs, { headers: { "x-api-key": key } });
+      }
+      const data = await r.json().catch(() => null);
+      if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
+      if (!r.ok) return { videoId: id, title: "", author: "", ok: false, text: "" };
+      return normalizeSupadata(id, data, withTs);
+    }));
+    settled.forEach((x) => { if (x) results.push(x); });
+  }
+  if (hardError && !results.some((t) => t.ok)) return { error: hardError };
+  const byId = {}; results.forEach((t) => { byId[t.videoId] = t; });
+  return { transcripts: ids.map((id) => byId[id] || { videoId: id, title: "", author: "", ok: false, text: "" }) };
 }
 
 /* ---------- provider: youtube-transcript.io (paid) ---------- */
@@ -130,12 +182,15 @@ function mock(ids, withTs) {
   }));
 }
 
-function chooseProvider() {
-  const p = (process.env.TRANSCRIPT_PROVIDER || "").toLowerCase();
-  if (p) return p;
-  if (process.env.APIFY_TOKEN) return "apify";
-  if (process.env.YT_TRANSCRIPT_TOKEN) return "ytio";
-  return "none";
+const PROVIDERS = { apify: viaApify, supadata: viaSupadata, ytio: viaYtio };
+function providerChain() {
+  const forced = (process.env.TRANSCRIPT_PROVIDER || "").toLowerCase();
+  if (forced && PROVIDERS[forced]) return [forced];
+  const chain = [];
+  if (process.env.APIFY_TOKEN) chain.push("apify");
+  if (process.env.SUPADATA_API_KEY) chain.push("supadata");
+  if (process.env.YT_TRANSCRIPT_TOKEN) chain.push("ytio");
+  return chain;
 }
 
 module.exports = async (req, res) => {
@@ -147,17 +202,26 @@ module.exports = async (req, res) => {
   if (body.mock) return res.status(200).json({ transcripts: mock(ids, withTs), provider: "mock" });
   if (!ids.length) return res.status(400).json({ error: "Provide an 'ids' array of YouTube video IDs (max 50)." });
 
-  const provider = chooseProvider();
-  try {
-    let result;
-    if (provider === "apify") result = await viaApify(ids, withTs, body.debug);
-    else if (provider === "ytio") result = await viaYtio(ids, withTs, body.debug);
-    else return res.status(500).json({ error: "no_provider", message: "No transcript backend configured. Set APIFY_TOKEN (free) or YT_TRANSCRIPT_TOKEN." });
+  const chain = providerChain();
+  if (!chain.length) return res.status(500).json({ error: "no_provider", message: "No transcript backend configured. Set APIFY_TOKEN or SUPADATA_API_KEY (both free) or YT_TRANSCRIPT_TOKEN." });
 
-    if (result.error) return res.status(result.error.status).json(result.error.body);
-    result.provider = provider;
-    return res.status(200).json(result);
-  } catch (e) {
-    return res.status(502).json({ error: "fetch_failed", provider, detail: String(e && e.message || e) });
+  let lastError = null;
+  const attempted = [];
+  for (const name of chain) {
+    try {
+      const result = await PROVIDERS[name](ids, withTs, body.debug);
+      if (!result.error) {
+        result.provider = name;
+        if (attempted.length) result.fellBackFrom = attempted;
+        return res.status(200).json(result);
+      }
+      lastError = result.error;
+      attempted.push(name);
+    } catch (e) {
+      lastError = { status: 502, body: { error: "fetch_failed", provider: name, detail: String(e && e.message || e) } };
+      attempted.push(name);
+    }
   }
+  lastError.body.attempted = attempted;
+  return res.status(lastError.status).json(lastError.body);
 };
