@@ -111,31 +111,65 @@ function normalizeSupadata(id, data, withTs) {
   }
   return { videoId: id, title: "", author: "", language: data.lang || "", ok: !!text, text };
 }
-async function viaSupadata(ids, withTs, debug) {
+async function viaSupadata(ids, withTs, debug, lang) {
   const key = process.env.SUPADATA_API_KEY;
   if (!key) return { error: { status: 500, body: { error: "no_supadata_key", message: "Server is missing SUPADATA_API_KEY (free tier)." } } };
+  lang = lang || "en";
   const results = [];
   let hardError = null;
   const CONC = 4;
+  const fetchOne = async (id, useLang) => {
+    // Videos with many translated tracks (e.g. TED talks) return an arbitrary
+    // language when none is specified — so we ALWAYS ask for the preferred
+    // language first, then retry without it if that track doesn't exist.
+    const qs = "url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + id)
+      + (useLang ? "&lang=" + encodeURIComponent(lang) : "")
+      + (withTs ? "" : "&text=true");
+    let r = await fetch("https://api.supadata.ai/v1/transcript?" + qs, { headers: { "x-api-key": key } });
+    if (r.status === 429) {
+      await new Promise((z) => setTimeout(z, 2200));
+      r = await fetch("https://api.supadata.ai/v1/transcript?" + qs, { headers: { "x-api-key": key } });
+    }
+    return r;
+  };
   for (let i = 0; i < ids.length && !hardError; i += CONC) {
     const group = ids.slice(i, i + CONC);
     const settled = await Promise.all(group.map(async (id) => {
-      const qs = "url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + id) + (withTs ? "" : "&text=true");
-      let r = await fetch("https://api.supadata.ai/v1/transcript?" + qs, { headers: { "x-api-key": key } });
-      if (r.status === 429) { // one retry after backoff
-        await new Promise((z) => setTimeout(z, 2200));
-        r = await fetch("https://api.supadata.ai/v1/transcript?" + qs, { headers: { "x-api-key": key } });
-      }
-      const data = await r.json().catch(() => null);
+      let r = await fetchOne(id, true);
+      let data = await r.json().catch(() => null);
       if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
-      if (!r.ok) return { videoId: id, title: "", author: "", ok: false, text: "" };
-      return normalizeSupadata(id, data, withTs);
+      let out = r.ok ? normalizeSupadata(id, data, withTs) : null;
+      if (!out || !out.ok) {
+        // preferred language track missing — take whatever the video has
+        r = await fetchOne(id, false);
+        data = await r.json().catch(() => null);
+        if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
+        if (r.ok) out = normalizeSupadata(id, data, withTs);
+      }
+      return out || { videoId: id, title: "", author: "", ok: false, text: "" };
     }));
     settled.forEach((x) => { if (x) results.push(x); });
   }
   if (hardError && !results.some((t) => t.ok)) return { error: hardError };
   const byId = {}; results.forEach((t) => { byId[t.videoId] = t; });
   return { transcripts: ids.map((id) => byId[id] || { videoId: id, title: "", author: "", ok: false, text: "" }) };
+}
+
+/* ---------- title/author enrichment via YouTube oEmbed (free, no key) ---------- */
+async function enrichTitles(transcripts) {
+  const missing = transcripts.filter((t) => t.ok && !t.title);
+  if (!missing.length) return;
+  const CONC = 5;
+  for (let i = 0; i < missing.length; i += CONC) {
+    await Promise.all(missing.slice(i, i + CONC).map(async (t) => {
+      try {
+        const r = await fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + t.videoId));
+        if (!r.ok) return;
+        const d = await r.json().catch(() => null);
+        if (d) { t.title = d.title || t.title; t.author = t.author || d.author_name || ""; }
+      } catch { /* non-fatal */ }
+    }));
+  }
 }
 
 /* ---------- provider: youtube-transcript.io (paid) ---------- */
@@ -205,14 +239,16 @@ module.exports = async (req, res) => {
   const chain = providerChain();
   if (!chain.length) return res.status(500).json({ error: "no_provider", message: "No transcript backend configured. Set APIFY_TOKEN or SUPADATA_API_KEY (both free) or YT_TRANSCRIPT_TOKEN." });
 
+  const lang = typeof body.lang === "string" && /^[a-zA-Z-]{2,8}$/.test(body.lang) ? body.lang : "en";
   let lastError = null;
   const attempted = [];
   for (const name of chain) {
     try {
-      const result = await PROVIDERS[name](ids, withTs, body.debug);
+      const result = await PROVIDERS[name](ids, withTs, body.debug, lang);
       if (!result.error) {
         result.provider = name;
         if (attempted.length) result.fellBackFrom = attempted;
+        await enrichTitles(result.transcripts);
         return res.status(200).json(result);
       }
       lastError = result.error;
