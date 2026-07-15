@@ -36,19 +36,29 @@
   <header class="tool-hero">
     <div class="kicker">Channel → Text</div>
     <h1 style="font-size:clamp(36px,5.6vw,64px); font-weight:800; letter-spacing:-.035em; line-height:1.05; max-width:18ch">
-      Feed an entire YouTube channel to your <span class="chopword">LLM</span>.
+      Paste a YouTube link. Get the <span class="chopword">transcript</span>.
     </h1>
     <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:60ch; line-height:1.6">
-      Point YouChop at any channel. It pulls every video's transcript and hands you one clean block of text — ready to paste into <strong style="color:var(--ink)">Claude, ChatGPT, Cursor,</strong> or any tool with a context window.
+      Clean, copy-paste text for <strong style="color:var(--ink)">Claude, ChatGPT, Cursor,</strong> or any tool with a context window — one video, or a whole channel at once. No watching, no scrubbing.
     </p>
 
     <div class="mode-tabs">
-      <button class="mode-tab active" data-mode="channel" id="tab-channel">Search a channel</button>
-      <button class="mode-tab" data-mode="paste" id="tab-paste">Paste video links</button>
+      <button class="mode-tab active" data-mode="single" id="tab-single">Single video</button>
+      <button class="mode-tab" data-mode="channel" id="tab-channel">Whole channel</button>
+      <button class="mode-tab" data-mode="paste" id="tab-paste">Paste a list</button>
+    </div>
+
+    <!-- SINGLE MODE -->
+    <div id="mode-single">
+      <div class="input-row">
+        <input class="tool-input" id="single-input" placeholder="https://youtube.com/watch?v=…   —   paste any YouTube link" autocomplete="off" />
+        <button class="btn btn-red" id="single-btn">Get transcript</button>
+      </div>
+      <p class="input-hint">One link in, one transcript out — copy it straight into your LLM.</p>
     </div>
 
     <!-- CHANNEL MODE -->
-    <div id="mode-channel">
+    <div id="mode-channel" style="display:none">
       <div class="input-row">
         <input class="tool-input" id="channel-input" placeholder="Search by name — “Veritasium” — or paste @handle / channel URL" autocomplete="off" />
         <button class="btn btn-red" id="find-btn">Search</button>
@@ -90,7 +100,7 @@
   <!-- OUTPUT -->
   <div class="out-panel" id="out-panel">
     <div class="out-bar">
-      <div class="out-stats"><b id="stat-videos">0</b> videos · <b id="stat-words">0</b> words · ~<b id="stat-tokens">0</b> tokens</div>
+      <div class="out-stats"><b id="stat-videos">0</b> <span id="stat-vlabel">videos</span> · <b id="stat-words">0</b> words · ~<b id="stat-tokens">0</b> tokens</div>
       <div class="out-controls">
         <div class="seg-toggle">
           <button id="fmt-clean" class="on">Clean text</button>
@@ -166,15 +176,16 @@
   }
 
   // ---- mode tabs ----
-  var mode = "channel";
+  var mode = "single";
   function setMode(m) {
     mode = m;
-    $("tab-channel").classList.toggle("active", m === "channel");
-    $("tab-paste").classList.toggle("active", m === "paste");
-    $("mode-channel").style.display = m === "channel" ? "" : "none";
-    $("mode-paste").style.display = m === "paste" ? "" : "none";
+    ["single", "channel", "paste"].forEach(function (x) {
+      $("tab-" + x).classList.toggle("active", m === x);
+      $("mode-" + x).style.display = m === x ? "" : "none";
+    });
     clearErr();
   }
+  $("tab-single").onclick = function () { setMode("single"); };
   $("tab-channel").onclick = function () { setMode("channel"); };
   $("tab-paste").onclick = function () { setMode("paste"); };
 
@@ -273,6 +284,29 @@
     renderList();
   };
 
+  // ---- single video: paste a link -> one transcript ----
+  $("single-btn").onclick = async function () {
+    clearErr();
+    var ids = parseVideoIds($("single-input").value);
+    if (!ids.length) return showErr("Paste a valid YouTube link (or an 11-character video ID).");
+    var id = ids[0];
+    $("single-btn").textContent = "Fetching…"; $("single-btn").disabled = true;
+    $("videos-panel").classList.remove("show");
+    $("out-panel").classList.remove("show");
+    $("progress").classList.add("show");
+    $("pbar-fill").style.width = "35%";
+    $("pstat").textContent = "Pulling transcript…";
+    state.channel = ""; state.transcripts = {};
+    state.videos = [{ videoId: id, title: "", selected: true, state: "pend" }];
+    var okB = await pullBatch([id], [{ v: state.videos[0], i: 0 }]);
+    $("pbar-fill").style.width = "100%";
+    setTimeout(function () { $("progress").classList.remove("show"); $("pbar-fill").style.width = "0%"; }, 400);
+    $("single-btn").textContent = "Get transcript"; $("single-btn").disabled = false;
+    if (state.transcripts[id]) render();
+    else if (okB) showErr("No transcript available for that video — it may have captions disabled.");
+  };
+  $("single-input").addEventListener("keydown", function (e) { if (e.key === "Enter") $("single-btn").click(); });
+
   function errMsg(d, status) {
     var e = d && d.error;
     if (e === "no_data_key") return "Channel search isn't wired up yet — the server needs a free YouTube Data API key (YT_DATA_API_KEY). You can still use Paste video links.";
@@ -347,6 +381,13 @@
   }
   function buildText(withTs) {
     var ts = orderedTranscripts();
+    if (ts.length === 1) {
+      var t0 = ts[0];
+      var txt0 = (withTs ? (t0.textTs || t0.text) : t0.text) || "(no transcript available)";
+      return "# " + (t0.title || "YouTube transcript") + "\n" +
+        "https://youtube.com/watch?v=" + t0.videoId + (t0.author ? "  ·  " + t0.author : "") + "\n" +
+        "# via youchop.app\n\n" + txt0 + "\n";
+    }
     var head = "# Transcripts from " + (state.channel || "YouTube") + " (" + ts.length + " videos)\n" +
       "# Pulled with youchop.app — each video delimited by ====\n\n";
     var body = ts.map(function (t) {
@@ -384,6 +425,7 @@
     var words = (text.trim().match(/\S+/g) || []).length;
     var tokens = Math.round(text.length / 4);
     $("stat-videos").textContent = ts.length;
+    $("stat-vlabel").textContent = ts.length === 1 ? "video" : "videos";
     $("stat-words").textContent = words.toLocaleString();
     $("stat-tokens").textContent = tokens.toLocaleString();
     $("ctx-note").textContent = tokens > 190000
