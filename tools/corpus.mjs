@@ -23,7 +23,7 @@
  */
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const pexec = promisify(exec);
@@ -40,6 +40,9 @@ const MIN_MIN = Number(arg("--min-minutes", "20"));
 const OUT_ROOT = arg("--out", "./corpus");
 const ENDPOINT = arg("--endpoint", "https://youchop.app/api/transcripts");
 const PAUSE = Number(arg("--pause", "3500"));
+// --local pulls captions straight from YouTube with yt-dlp on this machine
+// (residential IP): free, no quota, no provider. Best for bulk corpus building.
+const LOCAL = argv.includes("--local");
 
 const slugify = (s) => String(s).toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 const handle = channel.replace(/^.*@/, "@").split("/")[0];
@@ -99,8 +102,66 @@ const manifest = entries.map((e, i) => {
   };
 });
 
-console.log(`▸ Pulling transcripts via ${new URL(ENDPOINT).host} (sequential, ${PAUSE}ms apart) …\n`);
+/* ---------- LOCAL MODE: pull captions straight from YouTube with yt-dlp ----------
+ * Runs on this machine's residential IP, so none of the datacenter-IP blocking
+ * (or provider quota) applies. Verified to produce byte-identical transcripts to
+ * the hosted API. Free and effectively unlimited — just pace the requests.        */
+function parseJson3(fp) {
+  const d = JSON.parse(readFileSync(fp, "utf8"));
+  const out = [];
+  for (const ev of d.events || []) {
+    if (ev.aAppend) continue;                      // rolling-caption duplicate
+    const line = (ev.segs || []).map((s) => s.utf8 || "").join("").replace(/\n/g, " ").trim();
+    if (line) out.push(line);
+  }
+  return out.join(" ").replace(/\s+/g, " ").trim();
+}
+function pickSubFile(dir, id) {
+  const files = readdirSync(dir).filter((f) => f.startsWith(id + ".") && f.endsWith(".json3"));
+  if (!files.length) return null;
+  // prefer a manual "en" track, then the original-language track, then anything English
+  return join(dir, files.sort((a, b) => {
+    const score = (f) => (/\.en\.json3$/.test(f) ? 0 : /\.en-orig\.json3$/.test(f) ? 1 : 2);
+    return score(a) - score(b);
+  })[0]);
+}
+
 let ok = 0, skipped = 0, failed = 0, stopped = false;
+
+if (LOCAL) {
+  const SUBS = join(OUT, "_subs");
+  mkdirSync(SUBS, { recursive: true });
+  const todo = manifest.filter((m) => !existsSync(join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`)));
+  skipped = manifest.length - todo.length;
+  console.log(`▸ LOCAL mode — pulling captions with yt-dlp (no API, no quota). ${todo.length} to fetch, ${skipped} already staged.\n`);
+  if (todo.length) {
+    const listPath = join(OUT, "_sub_urls.txt");
+    writeFileSync(listPath, todo.map((m) => m.url).join("\n"));
+    try {
+      await ytdlp(["--write-auto-subs", "--write-subs", "--sub-langs", "en.*", "--sub-format", "json3",
+        "--skip-download", "--no-warnings", "--ignore-errors",
+        "--sleep-requests", String(Math.max(1, Math.round(PAUSE / 1000))),
+        "-o", join(SUBS, "%(id)s.%(ext)s"), "-a", listPath]);
+    } catch (e) {
+      console.log(`  ⚠ yt-dlp reported errors (continuing with whatever landed): ${String(e.message || e).slice(0, 120)}`);
+    }
+  }
+  for (const m of manifest) {
+    const rawPath = join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`);
+    if (existsSync(rawPath)) { m.words = (readFileSync(rawPath, "utf8").match(/\S+/g) || []).length; continue; }
+    const sub = pickSubFile(SUBS, m.id);
+    if (!sub) { console.log(`  ✗ [${m.rank}] no captions available — ${m.title}`); failed++; continue; }
+    const text = parseJson3(sub);
+    if (!text) { console.log(`  ✗ [${m.rank}] empty captions — ${m.title}`); failed++; continue; }
+    writeFileSync(rawPath, text, "utf8");
+    m.words = (text.match(/\S+/g) || []).length;
+    m.provider = "yt-dlp-local";
+    ok++;
+    console.log(`  ✓ [${m.rank}] ${m.words.toLocaleString()} words — ${m.title}`);
+  }
+} else {
+
+console.log(`▸ Pulling transcripts via ${new URL(ENDPOINT).host} (sequential, ${PAUSE}ms apart) …\n`);
 for (const m of manifest) {
   const rawPath = join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`);
   if (existsSync(rawPath)) { console.log(`  [${m.rank}] SKIP (staged) — ${m.title}`); m.words = (readFileSync(rawPath, "utf8").match(/\S+/g) || []).length; skipped++; continue; }
@@ -133,6 +194,7 @@ for (const m of manifest) {
     await sleep(PAUSE);
   }
 }
+} // end API mode
 
 // write manifest + one concatenated corpus file
 const done = manifest.filter((m) => m.words);
