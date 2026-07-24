@@ -1,116 +1,78 @@
 #!/usr/bin/env node
 /**
- * youchop corpus builder — turn a whole YouTube channel into a text corpus.
+ * youchop corpus builder — turn whole YouTube channels into text corpora.
  *
- *   node tools/corpus.mjs @GregIsenberg --top 20 --out "C:/path/to/knowledge"
+ *   node tools/corpus.mjs @AlexHormozi @bretthall9080 --local --top all --out ".../knowledge"
  *
- * Pipeline:
- *   1. Enumerate the channel with yt-dlp (no API key; runs on your own IP so
- *      YouTube doesn't datacenter-block it).
- *   2. Filter to long-form, rank by view count, take --top N.
- *   3. Pull each transcript through youchop.app/api/transcripts — sequential,
- *      polite, idempotent (skips already-staged), and STOPS on a provider cap
- *      instead of hammering.
- *   4. Write per-episode raw text, a manifest, and one concatenated corpus.md.
+ * Multiple channels in one run; each gets its own banner + live progress bar.
  *
- * Flags:
- *   --top N            how many episodes (default 20; "all" for everything)
- *   --min-minutes N    long-form threshold (default 20; 0 = no filter)
- *   --out DIR          parent output dir (default ./corpus)
- *   --name SLUG        folder name (default: derived from the handle)
- *   --endpoint URL     transcripts endpoint (default https://youchop.app/api/transcripts)
- *   --pause MS         delay between requests (default 3500)
+ * Modes:
+ *   --local   pull YouTube's own captions with yt-dlp on THIS machine (residential IP):
+ *             free, no API key, no provider quota. Best for bulk corpus building.
+ *   (default) hosted /api/transcripts (uses provider quota) — for parity with the website.
+ *
+ * Flags: --top N|all (default 20) · --min-minutes N (default 20) · --out DIR
+ *        --name SLUG (single channel only) · --pause MS (default 900) · --endpoint URL
+ *
+ * Resume: idempotent by CONTENT — an episode already in <corpus>/_raw (matched by slug,
+ * any rank prefix) is skipped. Re-run the exact command to resume after a stop.
+ *
+ * Per channel it writes: corpus.md (====-delimited), _raw/NNN-slug.txt, manifest.json.
  */
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 
 const pexec = promisify(exec);
 const argv = process.argv.slice(2);
-const arg = (f, d) => { const i = argv.indexOf(f); return i > -1 && argv[i + 1] ? argv[i + 1] : d; };
-const channel = argv.find((a) => !a.startsWith("--") && (argv.indexOf(a) === 0 || !argv[argv.indexOf(a) - 1]?.startsWith("--")));
 
-if (!channel) {
-  console.error("Usage: node corpus.mjs <@handle|channel-url> [--top N] [--min-minutes N] [--out DIR] [--name SLUG]");
+// ---- arg parsing: value-flags consume the next token; bare tokens are channels ----
+const VALUE_FLAGS = new Set(["--top", "--min-minutes", "--out", "--name", "--pause", "--endpoint"]);
+const opt = {}; const channels = [];
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (VALUE_FLAGS.has(a)) { opt[a.slice(2)] = argv[++i]; }
+  else if (a.startsWith("--")) { opt[a.slice(2)] = true; }
+  else channels.push(a);
+}
+if (!channels.length) {
+  console.error("Usage: node corpus.mjs <@handle ...> [--local] [--top N|all] [--min-minutes N] [--out DIR] [--name SLUG] [--pause MS]");
   process.exit(1);
 }
-const TOP = arg("--top", "20");
-const MIN_MIN = Number(arg("--min-minutes", "20"));
-const OUT_ROOT = arg("--out", "./corpus");
-const ENDPOINT = arg("--endpoint", "https://youchop.app/api/transcripts");
-const PAUSE = Number(arg("--pause", "3500"));
-// --local pulls captions straight from YouTube with yt-dlp on this machine
-// (residential IP): free, no quota, no provider. Best for bulk corpus building.
-const LOCAL = argv.includes("--local");
+const TOP = opt.top || "20";
+const MIN_MIN = Number(opt["min-minutes"] ?? 20);
+const OUT_ROOT = opt.out || "./corpus";
+const ENDPOINT = opt.endpoint || "https://youchop.app/api/transcripts";
+const PAUSE = Number(opt.pause ?? 900);
+const LOCAL = !!opt.local;
+if (opt.name && channels.length > 1) { console.error("--name only works with a single channel."); process.exit(1); }
 
-const slugify = (s) => String(s).toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-const handle = channel.replace(/^.*@/, "@").split("/")[0];
-const NAME = arg("--name", slugify(handle.replace("@", "")));
-const OUT = join(OUT_ROOT, NAME);
-const RAW = join(OUT, "_raw");
-mkdirSync(RAW, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Windows-safe: resolve a python interpreter and run through a shell so PATHEXT applies.
+const slugify = (s) => String(s).toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 const q = (s) => (/[\s"&|<>^]/.test(String(s)) ? `"${String(s).replace(/"/g, '\\"')}"` : String(s));
+const wc = (t) => (t.match(/\S+/g) || []).length;
+
+// ---- yt-dlp via a resolved python (Windows-safe) ----
 let PY = process.env.PYTHON || "";
 async function resolvePython() {
   if (PY) return PY;
-  for (const cand of ["python", "py", "python3"]) {
-    try { await pexec(`${cand} -m yt_dlp --version`, { maxBuffer: 1 << 20 }); PY = cand; return PY; } catch {}
-  }
-  console.error("\n✗ Could not run yt-dlp. Install it with:  python -m pip install --user yt-dlp");
-  console.error("  (or set PYTHON=/full/path/to/python)");
+  for (const c of ["python", "py", "python3"]) { try { await pexec(`${c} -m yt_dlp --version`, { maxBuffer: 1 << 20 }); PY = c; return; } catch {} }
+  console.error("\n✗ yt-dlp not runnable. Install:  python -m pip install --user yt-dlp   (or set PYTHON=/path/to/python)");
   process.exit(1);
 }
-const ytdlp = async (args) => {
+async function ytdlp(args, { maxBuffer = 1 << 29 } = {}) {
   await resolvePython();
-  const cmd = [PY, "-m", "yt_dlp", ...args].map(q).join(" ");
-  const { stdout } = await pexec(cmd, { maxBuffer: 1024 * 1024 * 512 });
+  const { stdout } = await pexec([PY, "-m", "yt_dlp", ...args].map(q).join(" "), { maxBuffer });
   return stdout;
-};
+}
 
-console.log(`\n▸ Enumerating ${handle} …`);
-const url = channel.startsWith("http") ? channel : `https://www.youtube.com/${handle}/videos`;
-const flat = JSON.parse(await ytdlp(["--flat-playlist", "--no-warnings", "-J", url]));
-let entries = (flat.entries || []).filter((e) => (e.duration || 0) >= MIN_MIN * 60);
-entries.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
-const total = entries.length;
-if (TOP !== "all") entries = entries.slice(0, Number(TOP));
-console.log(`  ${flat.entries?.length || 0} videos · ${total} long-form (>=${MIN_MIN}m) · taking ${entries.length}`);
-
-// full metadata (dates, exact views, descriptions) for the selected slice
-console.log(`▸ Fetching metadata for ${entries.length} …`);
-const urls = entries.map((e) => `https://www.youtube.com/watch?v=${e.id}`);
-writeFileSync(join(OUT, "_urls.txt"), urls.join("\n"));
-const metaOut = await ytdlp(["--dump-json", "--skip-download", "--no-warnings", "--sleep-requests", "1", "-a", join(OUT, "_urls.txt")]);
-const byId = {};
-for (const line of metaOut.split("\n")) { if (!line.trim()) continue; try { const r = JSON.parse(line); byId[r.id] = r; } catch {} }
-
-const manifest = entries.map((e, i) => {
-  const m = byId[e.id] || {};
-  const p = m.upload_date || "";
-  return {
-    rank: i + 1, id: e.id, title: m.title || e.title || "",
-    slug: slugify(m.title || e.title || e.id),
-    url: `https://www.youtube.com/watch?v=${e.id}`,
-    published: p.length === 8 ? `${p.slice(0, 4)}-${p.slice(4, 6)}-${p.slice(6, 8)}` : "",
-    views: m.view_count ?? e.view_count ?? 0,
-    duration_min: Math.round((m.duration ?? e.duration ?? 0) / 60),
-    description: m.description || "",
-  };
-});
-
-/* ---------- LOCAL MODE: pull captions straight from YouTube with yt-dlp ----------
- * Runs on this machine's residential IP, so none of the datacenter-IP blocking
- * (or provider quota) applies. Verified to produce byte-identical transcripts to
- * the hosted API. Free and effectively unlimited — just pace the requests.        */
+// ---- caption parsing (json3) ----
 function parseJson3(fp) {
   const d = JSON.parse(readFileSync(fp, "utf8"));
   const out = [];
   for (const ev of d.events || []) {
-    if (ev.aAppend) continue;                      // rolling-caption duplicate
+    if (ev.aAppend) continue; // rolling-caption duplicate line
     const line = (ev.segs || []).map((s) => s.utf8 || "").join("").replace(/\n/g, " ").trim();
     if (line) out.push(line);
   }
@@ -119,99 +81,106 @@ function parseJson3(fp) {
 function pickSubFile(dir, id) {
   const files = readdirSync(dir).filter((f) => f.startsWith(id + ".") && f.endsWith(".json3"));
   if (!files.length) return null;
-  // prefer a manual "en" track, then the original-language track, then anything English
-  return join(dir, files.sort((a, b) => {
-    const score = (f) => (/\.en\.json3$/.test(f) ? 0 : /\.en-orig\.json3$/.test(f) ? 1 : 2);
-    return score(a) - score(b);
-  })[0]);
+  return join(dir, files.sort((a, b) => (/\.en\.json3$/.test(a) ? 0 : /\.en-orig\.json3$/.test(a) ? 1 : 2) - (/\.en\.json3$/.test(b) ? 0 : /\.en-orig\.json3$/.test(b) ? 1 : 2))[0]);
 }
 
-let ok = 0, skipped = 0, failed = 0, stopped = false;
+// ---- progress bar (one line per video; file-friendly, no \r) ----
+function bar(done, total, w = 22) {
+  const pct = total ? done / total : 1, fill = Math.round(pct * w);
+  return `[${String(done).padStart(String(total).length)}/${total}] ${"█".repeat(fill)}${"░".repeat(w - fill)} ${String(Math.round(pct * 100)).padStart(3)}%`;
+}
 
-if (LOCAL) {
-  const SUBS = join(OUT, "_subs");
-  mkdirSync(SUBS, { recursive: true });
-  const todo = manifest.filter((m) => !existsSync(join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`)));
-  skipped = manifest.length - todo.length;
-  console.log(`▸ LOCAL mode — pulling captions with yt-dlp (no API, no quota). ${todo.length} to fetch, ${skipped} already staged.\n`);
-  if (todo.length) {
-    const listPath = join(OUT, "_sub_urls.txt");
-    writeFileSync(listPath, todo.map((m) => m.url).join("\n"));
-    try {
-      await ytdlp(["--write-auto-subs", "--write-subs", "--sub-langs", "en.*", "--sub-format", "json3",
-        "--skip-download", "--no-warnings", "--ignore-errors",
-        "--sleep-requests", String(Math.max(1, Math.round(PAUSE / 1000))),
-        "-o", join(SUBS, "%(id)s.%(ext)s"), "-a", listPath]);
-    } catch (e) {
-      console.log(`  ⚠ yt-dlp reported errors (continuing with whatever landed): ${String(e.message || e).slice(0, 120)}`);
-    }
-  }
-  for (const m of manifest) {
-    const rawPath = join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`);
-    if (existsSync(rawPath)) { m.words = (readFileSync(rawPath, "utf8").match(/\S+/g) || []).length; continue; }
-    const sub = pickSubFile(SUBS, m.id);
-    if (!sub) { console.log(`  ✗ [${m.rank}] no captions available — ${m.title}`); failed++; continue; }
-    const text = parseJson3(sub);
-    if (!text) { console.log(`  ✗ [${m.rank}] empty captions — ${m.title}`); failed++; continue; }
-    writeFileSync(rawPath, text, "utf8");
-    m.words = (text.match(/\S+/g) || []).length;
-    m.provider = "yt-dlp-local";
-    ok++;
-    console.log(`  ✓ [${m.rank}] ${m.words.toLocaleString()} words — ${m.title}`);
-  }
-} else {
+async function processChannel(channel, idx) {
+  // "@handle=folder-name" pins the output folder (so re-runs resume the right corpus)
+  const eq = channel.indexOf("=");
+  const rawHandle = eq > -1 ? channel.slice(0, eq) : channel;
+  const forcedName = eq > -1 ? channel.slice(eq + 1) : "";
+  const handle = rawHandle.replace(/^.*@/, "@").split("/")[0];
+  const name = forcedName || (channels.length === 1 && opt.name) || slugify(handle.replace("@", ""));
+  const OUT = join(OUT_ROOT, name), RAW = join(OUT, "_raw"), SUBS = join(OUT, "_subs");
+  mkdirSync(RAW, { recursive: true });
+  const findStaged = (slug) => { try { const h = readdirSync(RAW).find((f) => f.endsWith(`-${slug}.txt`)); return h ? join(RAW, h) : null; } catch { return null; } };
 
-console.log(`▸ Pulling transcripts via ${new URL(ENDPOINT).host} (sequential, ${PAUSE}ms apart) …\n`);
-for (const m of manifest) {
-  const rawPath = join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`);
-  if (existsSync(rawPath)) { console.log(`  [${m.rank}] SKIP (staged) — ${m.title}`); m.words = (readFileSync(rawPath, "utf8").match(/\S+/g) || []).length; skipped++; continue; }
+  console.log(`\n${"═".repeat(64)}\n▓ [${idx + 1}/${channels.length}] ${handle}  →  ${name}\n${"═".repeat(64)}`);
+  const url = rawHandle.startsWith("http") ? rawHandle : `https://www.youtube.com/${handle}/videos`;
+  const flat = JSON.parse(await ytdlp(["--flat-playlist", "--no-warnings", "-J", url]));
+  let entries = (flat.entries || []).filter((e) => (e.duration || 0) >= MIN_MIN * 60);
+  entries.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+  const totalLong = entries.length;
+  if (TOP !== "all") entries = entries.slice(0, Number(TOP));
+  console.log(`  ${flat.entries?.length || 0} videos · ${totalLong} ≥${MIN_MIN}m · taking ${entries.length}`);
+
+  // metadata (dates/exact views/descriptions) for the slice
+  writeFileSync(join(OUT, "_urls.txt"), entries.map((e) => `https://www.youtube.com/watch?v=${e.id}`).join("\n"));
+  const byId = {};
   try {
-    const r = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [m.id], lang: "en" }) });
-    if ([402, 403, 429].includes(r.status)) {
-      const b = await r.json().catch(() => ({}));
-      console.log(`\n  ⛔ [${m.rank}] provider cap reached (HTTP ${r.status}: ${b.error || ""}). Stopping politely.`);
-      console.log(`  → ${ok} pulled this run. Re-run the same command later; staged episodes are skipped automatically.`);
-      stopped = true; break;
+    const meta = await ytdlp(["--dump-json", "--skip-download", "--no-warnings", "--sleep-requests", "1", "-a", join(OUT, "_urls.txt")]);
+    for (const line of meta.split("\n")) { if (line.trim()) try { const r = JSON.parse(line); byId[r.id] = r; } catch {} }
+  } catch (e) { console.log(`  ⚠ metadata pass had errors (continuing): ${String(e.message || e).slice(0, 80)}`); }
+
+  const manifest = entries.map((e, i) => {
+    const m = byId[e.id] || {}, p = m.upload_date || "";
+    return { rank: i + 1, id: e.id, title: m.title || e.title || "", slug: slugify(m.title || e.title || e.id),
+      url: `https://www.youtube.com/watch?v=${e.id}`, published: p.length === 8 ? `${p.slice(0, 4)}-${p.slice(4, 6)}-${p.slice(6, 8)}` : "",
+      views: m.view_count ?? e.view_count ?? 0, duration_min: Math.round((m.duration ?? e.duration ?? 0) / 60), description: m.description || "" };
+  });
+
+  const todo = manifest.filter((m) => !findStaged(m.slug));
+  let ok = 0, skipped = manifest.length - todo.length, failed = 0;
+  console.log(`  ${LOCAL ? "LOCAL (yt-dlp captions, no quota)" : `hosted ${new URL(ENDPOINT).host}`} · ${todo.length} to fetch, ${skipped} already staged\n`);
+
+  let done = 0;
+  for (const m of manifest) {
+    const staged = findStaged(m.slug);
+    if (staged) { m.words = wc(readFileSync(staged, "utf8")); continue; }
+    done++;
+    const rawPath = join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`);
+    let text = null;
+    if (LOCAL) {
+      mkdirSync(SUBS, { recursive: true });
+      try {
+        await ytdlp(["--write-auto-subs", "--write-subs", "--sub-langs", "en.*", "--sub-format", "json3",
+          "--skip-download", "--no-warnings", "--ignore-errors", "-o", join(SUBS, "%(id)s.%(ext)s"), m.url]);
+      } catch {}
+      const sub = pickSubFile(SUBS, m.id);
+      text = sub ? parseJson3(sub) : "";
+    } else {
+      try {
+        const r = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [m.id], lang: "en" }) });
+        if ([402, 403, 429].includes(r.status)) { console.log(`\n  ⛔ provider cap (HTTP ${r.status}). Stopping — re-run to resume.`); break; }
+        const d = await r.json().catch(() => null); const t = d?.transcripts?.[0];
+        text = t?.ok ? t.text : ""; if (t?.title) m.title = t.title;
+      } catch (e) { text = ""; }
     }
-    const d = await r.json().catch(() => null);
-    const t = d?.transcripts?.[0];
-    if (!r.ok || !t?.ok || !t.text) {
-      console.log(`  ✗ [${m.rank}] no transcript — ${m.title}`);
-      failed++; if (failed >= 3) { console.log("\n  ⛔ repeated failures — stopping."); stopped = true; break; }
-      await sleep(PAUSE); continue;
+    if (text && text.length) {
+      writeFileSync(rawPath, text, "utf8"); m.words = wc(text); m.provider = LOCAL ? "yt-dlp-local" : "youchop-api"; ok++;
+      console.log(`  ${bar(done, todo.length)} ✓ ${m.words.toLocaleString().padStart(7)}w  ${m.title.slice(0, 54)}`);
+    } else {
+      failed++;
+      console.log(`  ${bar(done, todo.length)} ✗ no captions   ${m.title.slice(0, 54)}`);
     }
-    failed = 0;
-    writeFileSync(rawPath, t.text, "utf8");
-    m.words = (t.text.match(/\S+/g) || []).length;
-    m.provider = d.provider;
-    if (t.title) m.title = t.title;
-    ok++;
-    console.log(`  ✓ [${m.rank}] ${m.words.toLocaleString()} words — ${m.title}`);
-    await sleep(PAUSE);
-  } catch (e) {
-    console.log(`  ✗ [${m.rank}] ${String(e.message || e).slice(0, 70)}`);
-    failed++; if (failed >= 3) { stopped = true; break; }
-    await sleep(PAUSE);
+    if (!LOCAL) await sleep(PAUSE);
   }
+
+  // write manifest + concatenated corpus
+  const have = manifest.filter((m) => m.words);
+  writeFileSync(join(OUT, "manifest.json"), JSON.stringify({ channel: handle, name, generated: process.env.CORPUS_DATE || "", total_longform: totalLong, episodes: manifest }, null, 1), "utf8");
+  const totalWords = have.reduce((s, m) => s + m.words, 0);
+  let corpus = `# ${flat.channel || handle} — transcript corpus\n\n${have.length} episodes · ${totalWords.toLocaleString()} words · source: ${handle}\n` +
+    `Extracted with youchop.app. Each episode delimited by ====.\n` +
+    `NOTE: the creator's copyrighted work — PRIVATE input for research/synthesis, not for republication.\n\n`;
+  for (const m of have.sort((a, b) => a.rank - b.rank)) {
+    const sp = findStaged(m.slug); if (!sp) continue;
+    corpus += `\n==== [${m.rank}] ${m.title} ====\n${m.url} · ${m.published} · ${m.duration_min} min · ${m.views.toLocaleString()} views\n\n${readFileSync(sp, "utf8")}\n`;
+  }
+  writeFileSync(join(OUT, "corpus.md"), corpus, "utf8");
+  console.log(`\n  ▸ ${name}: ${ok} pulled, ${skipped} staged, ${failed} no-captions · ${have.length} episodes · ${totalWords.toLocaleString()} words`);
+  return { name, episodes: have.length, words: totalWords, failed };
 }
-} // end API mode
 
-// write manifest + one concatenated corpus file
-const done = manifest.filter((m) => m.words);
-writeFileSync(join(OUT, "manifest.json"), JSON.stringify({ channel: handle, name: NAME, generated: new Date().toISOString().slice(0, 10), total_longform: total, episodes: manifest }, null, 1), "utf8");
-
-const totalWords = done.reduce((s, m) => s + m.words, 0);
-let corpus = `# ${flat.channel || handle} — transcript corpus\n\n` +
-  `${done.length} episodes · ${totalWords.toLocaleString()} words · source: ${handle}\n` +
-  `Extracted with youchop.app. Each episode delimited by ====.\n` +
-  `NOTE: source material is the creator's copyrighted work — treat this corpus as PRIVATE input for research/synthesis, not for republication.\n\n`;
-for (const m of done) {
-  const text = readFileSync(join(RAW, `${String(m.rank).padStart(3, "0")}-${m.slug}.txt`), "utf8");
-  corpus += `\n==== [${m.rank}] ${m.title} ====\n${m.url} · ${m.published} · ${m.duration_min} min · ${m.views.toLocaleString()} views\n\n${text}\n`;
-}
-writeFileSync(join(OUT, "corpus.md"), corpus, "utf8");
-
-console.log(`\n▸ Done: ${ok} pulled, ${skipped} already staged, ${done.length} total in corpus.`);
-console.log(`  ${totalWords.toLocaleString()} words → ${join(OUT, "corpus.md")}`);
-console.log(`  manifest → ${join(OUT, "manifest.json")}   raw → ${RAW}`);
-if (stopped) console.log(`  ⚠ stopped early — re-run to resume.`);
+const summaries = [];
+for (let i = 0; i < channels.length; i++) summaries.push(await processChannel(channels[i], i));
+console.log(`\n${"═".repeat(64)}\n▓ ALL DONE`);
+let gw = 0, ge = 0;
+for (const s of summaries) { console.log(`  ${s.name.padEnd(22)} ${String(s.episodes).padStart(4)} eps · ${s.words.toLocaleString().padStart(12)} words${s.failed ? ` · ${s.failed} no-captions` : ""}`); gw += s.words; ge += s.episodes; }
+console.log(`  ${"TOTAL".padEnd(22)} ${String(ge).padStart(4)} eps · ${gw.toLocaleString().padStart(12)} words`);
