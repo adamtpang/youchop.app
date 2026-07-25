@@ -46,6 +46,8 @@ const OUT_ROOT = opt.out || "./corpus";
 const ENDPOINT = opt.endpoint || "https://youchop.app/api/transcripts";
 const PAUSE = Number(opt.pause ?? 900);
 const LOCAL = !!opt.local;
+// --brain also emits a ready-to-run gbrain brain next to the corpus
+const BRAIN = !!opt.brain;
 if (opt.name && channels.length > 1) { console.error("--name only works with a single channel."); process.exit(1); }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -174,6 +176,57 @@ async function processChannel(channel, idx) {
     corpus += `\n==== [${m.rank}] ${m.title} ====\n${m.url} · ${m.published} · ${m.duration_min} min · ${m.views.toLocaleString()} views\n\n${readFileSync(sp, "utf8")}\n`;
   }
   writeFileSync(join(OUT, "corpus.md"), corpus, "utf8");
+
+  // --brain: emit a ready-to-run gbrain brain (one markdown page per episode +
+  // setup instructions). The buyer runs the index locally with their own embedding
+  // key, so this costs youchop nothing per user. See STRATEGY.md / ECONOMICS.md.
+  if (BRAIN) {
+    const BR = join(OUT, "brain"), PAGES = join(BR, "pages");
+    mkdirSync(PAGES, { recursive: true });
+    const yaml = (s) => `"${String(s == null ? "" : s).replace(/"/g, '\\"')}"`;
+    for (const m of have) {
+      const sp = findStaged(m.slug); if (!sp) continue;
+      const page = `---\ntitle: ${yaml(m.title)}\ntype: transcript\nsource_channel: ${yaml(handle)}\nsource_url: ${yaml(m.url)}\nvideo_id: ${yaml(m.id)}\npublished: ${yaml(m.published)}\nduration_min: ${m.duration_min}\nviews: ${m.views}\nrank: ${m.rank}\nword_count: ${m.words}\ntags: [transcript, youchop, ${slugify(handle.replace("@", ""))}]\n---\n\n# ${m.title}\n\n${m.url} · ${m.published} · ${m.duration_min} min\n\n${readFileSync(sp, "utf8")}\n`;
+      writeFileSync(join(PAGES, `${String(m.rank).padStart(3, "0")}-${m.slug}.md`), page, "utf8");
+    }
+    const est = Math.round((totalWords * 1.33) / 1e6 * 0.02 * 100) / 100;
+    writeFileSync(join(BR, "SETUP.md"),
+`# ${flat.channel || handle} — corpus brain
+
+${have.length} episodes, ${totalWords.toLocaleString()} words, ready to index.
+Built with youchop.app. You own this outright.
+
+## Setup (about 2 minutes)
+
+    bun install -g github:garrytan/gbrain
+    export OPENAI_API_KEY=sk-...          # your key; embedding this corpus costs about $${est.toFixed(2)}
+    cd ${name}/brain
+    gbrain init --pglite
+    gbrain import ./pages
+
+PGLite means no server and no Docker. Everything stays on your machine.
+
+## Ask it things
+
+    gbrain query "what does this channel say about pricing"
+    gbrain search "exact phrase"
+
+Every answer cites the episode it came from, and each page's frontmatter carries the
+source_url so you can jump back to the video.
+
+## Use it from your own agent
+
+gbrain speaks MCP, so you can point Claude Code or any MCP client at this brain and let
+your agent query the corpus directly. See the gbrain README for the MCP server command.
+
+## Note on the source material
+
+These transcripts are the creator's copyrighted work. This brain is private input for
+research and synthesis. Do not republish the transcripts.
+`, "utf8");
+    console.log(`  ▸ brain export: ${have.length} pages → ${join(BR, "pages")} (embedding est. $${est.toFixed(2)})`);
+  }
+
   console.log(`\n  ▸ ${name}: ${ok} pulled, ${skipped} staged, ${failed} no-captions · ${have.length} episodes · ${totalWords.toLocaleString()} words`);
   return { name, episodes: have.length, words: totalWords, failed };
 }

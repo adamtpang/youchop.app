@@ -63,3 +63,70 @@ Explicitly NOT the moat: cheap LLM costs (every competitor has them) and the cho
 - 24h SLA on any Chrome Web Store policy email; YouChop break-fix preempts all other portfolio projects.
 - VA hire at a numeric trigger only: outreach >10 hrs/week AND reply rate >8%.
 - Contractor retainer funded from the first pack revenue.
+
+## The corpus brain (gbrain evaluation, 2026-07-25)
+
+*Extraction without retrieval is a pipe, not a product.* `/extract` turns a channel into a
+wall of text that a human pastes into an LLM once and then loses. The question was whether
+pairing it with gbrain (github.com/garrytan/gbrain, MIT: hybrid vector + keyword + graph
+store over markdown, 30+ MCP tools) turns that output into something you can ask questions
+of, with citations, forever.
+
+### What the test actually showed
+
+Indexed the real 48-episode Founders corpus (840,544 words) into gbrain with PGLite.
+
+**Ingestion is a clean fit.** 48 pages, 2,116 chunks, 3.8 seconds, zero errors. The
+frontmatter + principle + Key lessons + transcript layout our episode files already use is
+exactly the shape gbrain wants. No reformatting needed.
+
+**Exact retrieval with citations works.** Searching "idiot index" returned the precise
+passage from `009-how-elon-thinks` where the term is defined, plus the semantically adjacent
+SpaceX cost-structure passage. "prototypes failure" ranked the Dyson episode first. Real
+hits, correctly cited to file.
+
+**Conceptual retrieval was NOT proven, and this is the honest gap.** Asking the actual user
+question, "what do these founders say about pricing", returned document headers and
+unrelated passages. Weak, and not shippable as-is.
+
+The cause is identified, not mysterious: gbrain's embedding providers are OpenAI,
+ZeroEntropy, and Voyage only. **Ollama is a chat provider in gbrain, not an embedding one**,
+so there is no free local embedding path. The test therefore ran `--no-embedding`, which
+exercises only the keyword (tsvector) leg. Keyword search failing a conceptual question is
+the expected result, and it is exactly the gap vector search fills. **The pairing is
+plausible but unproven.** Completing the proof costs about $0.02 in embeddings (see
+ECONOMICS.md) and needs one key.
+
+### Decision: shape (b), the export. Not hosted.
+
+YouChop ships a **ready-to-run local brain**, not an "ask this channel" web surface.
+
+Why:
+- **Marginal cost stays zero.** The buyer supplies their own embedding key, so YouChop adds
+  no per-user cost line. This is the only shape that satisfies the free-tiers-first rule in
+  ECONOMICS.md without qualification.
+- **No hosted vector database**, no per-user storage, no auth surface, no bill that grows
+  with success.
+- **No new liability.** Hosting a searchable index of someone else's copyrighted catalog is
+  a very different legal posture from handing a creator a brain built from their own videos.
+  The export keeps us where we already decided to be: private research and synthesis, never
+  republication.
+- **It matches the promise creators.html already makes**: editable text, yours forever, even
+  if you never use YouChop again. A brain folder they own outright is the same promise.
+- (c) MCP endpoint is the natural follow-on and costs almost nothing extra once the export
+  exists, because the export IS a gbrain brain and gbrain already speaks MCP. Ship (b), get
+  (c) nearly free.
+
+Rejected (a) hosted "ask this channel": it needs a database, per-user cost, moderation, and
+it puts us in the business of serving other people's catalogs to strangers. That is the one
+version of this that could get YouChop sued by the exact creators it wants as customers.
+
+### Positioning
+
+"Turn any channel into a brain you can ask" is the higher-value creator and researcher SKU.
+Chapters stay the consumer wedge and the distribution mechanic. Nothing about the extension
+or the chapters product changes.
+
+**Gate before selling it:** run the $0.02 embedded test and confirm conceptual questions
+return good cited answers. If they do not, this stays an internal tool and the SKU does not
+ship. The evidence above does not yet clear that bar.
