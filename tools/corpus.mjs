@@ -80,6 +80,40 @@ function parseJson3(fp) {
   }
   return out.join(" ").replace(/\s+/g, " ").trim();
 }
+// Same parse, but keeps the start time of each caption event so we can emit
+// deep links (youtube.com/watch?v=ID&t=NNNs) that jump to the exact moment.
+function parseJson3Timed(fp) {
+  const d = JSON.parse(readFileSync(fp, "utf8"));
+  const out = [];
+  for (const ev of d.events || []) {
+    if (ev.aAppend) continue;
+    const line = (ev.segs || []).map((s) => s.utf8 || "").join("").replace(/\n/g, " ").trim();
+    if (line) out.push({ t: Math.floor((ev.tStartMs || 0) / 1000), text: line });
+  }
+  return out;
+}
+// Group timed segments into readable paragraphs, each headed by a jumpable link.
+// A retrieved chunk then always carries a link to the moment it came from.
+function timedParagraphs(segs, videoUrl, everySec = 60) {
+  const clock = (s) => {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(x).padStart(2, "0");
+  };
+  const paras = [];
+  let cur = null;
+  for (const s of segs) {
+    if (!cur || s.t - cur.t >= everySec) {
+      if (cur) paras.push(cur);
+      cur = { t: s.t, parts: [] };
+    }
+    cur.parts.push(s.text);
+  }
+  if (cur) paras.push(cur);
+  const sep = videoUrl.includes("?") ? "&" : "?";
+  return paras
+    .map((p) => `[${clock(p.t)}](${videoUrl}${sep}t=${p.t}s) ${p.parts.join(" ").replace(/\s+/g, " ").trim()}`)
+    .join("\n\n");
+}
 function pickSubFile(dir, id) {
   const files = readdirSync(dir).filter((f) => f.startsWith(id + ".") && f.endsWith(".json3"));
   if (!files.length) return null;
@@ -184,9 +218,22 @@ async function processChannel(channel, idx) {
     const BR = join(OUT, "brain"), PAGES = join(BR, "pages");
     mkdirSync(PAGES, { recursive: true });
     const yaml = (s) => `"${String(s == null ? "" : s).replace(/"/g, '\\"')}"`;
+    let timedCount = 0;
     for (const m of have) {
       const sp = findStaged(m.slug); if (!sp) continue;
-      const page = `---\ntitle: ${yaml(m.title)}\ntype: transcript\nsource_channel: ${yaml(handle)}\nsource_url: ${yaml(m.url)}\nvideo_id: ${yaml(m.id)}\npublished: ${yaml(m.published)}\nduration_min: ${m.duration_min}\nviews: ${m.views}\nrank: ${m.rank}\nword_count: ${m.words}\ntags: [transcript, youchop, ${slugify(handle.replace("@", ""))}]\n---\n\n# ${m.title}\n\n${m.url} · ${m.published} · ${m.duration_min} min\n\n${readFileSync(sp, "utf8")}\n`;
+      // Prefer a timestamped body: every paragraph gets a deep link to its moment
+      // in the video, so any retrieved chunk is jumpable. Falls back to plain text
+      // when the caption file with timings is not on disk.
+      let body = null;
+      try {
+        const sub = existsSync(SUBS) ? pickSubFile(SUBS, m.id) : null;
+        if (sub) {
+          const segs = parseJson3Timed(sub);
+          if (segs.length) { body = timedParagraphs(segs, m.url); timedCount++; }
+        }
+      } catch { /* fall through to plain text */ }
+      if (!body) body = readFileSync(sp, "utf8");
+      const page = `---\ntitle: ${yaml(m.title)}\ntype: transcript\nsource_channel: ${yaml(handle)}\nsource_url: ${yaml(m.url)}\nvideo_id: ${yaml(m.id)}\npublished: ${yaml(m.published)}\nduration_min: ${m.duration_min}\nviews: ${m.views}\nrank: ${m.rank}\nword_count: ${m.words}\ntags: [transcript, youchop, ${slugify(handle.replace("@", ""))}]\n---\n\n# ${m.title}\n\nSource: [${m.title}](${m.url}) · ${m.published} · ${m.duration_min} min · ${m.views.toLocaleString()} views\n\n${body}\n`;
       writeFileSync(join(PAGES, `${String(m.rank).padStart(3, "0")}-${m.slug}.md`), page, "utf8");
     }
     const est = Math.round((totalWords * 1.33) / 1e6 * 0.02 * 100) / 100;
@@ -224,7 +271,7 @@ your agent query the corpus directly. See the gbrain README for the MCP server c
 These transcripts are the creator's copyrighted work. This brain is private input for
 research and synthesis. Do not republish the transcripts.
 `, "utf8");
-    console.log(`  ▸ brain export: ${have.length} pages → ${join(BR, "pages")} (embedding est. $${est.toFixed(2)})`);
+    console.log(`  ▸ brain export: ${have.length} pages (${timedCount} with timestamp deep links) → ${join(BR, "pages")} (embedding est. $${est.toFixed(2)})`);
   }
 
   console.log(`\n  ▸ ${name}: ${ok} pulled, ${skipped} staged, ${failed} no-captions · ${have.length} episodes · ${totalWords.toLocaleString()} words`);
