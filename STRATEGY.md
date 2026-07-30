@@ -170,3 +170,41 @@ hybrid pipeline. That needs ~1.1M tokens embedded, and Voyage's no-payment-metho
 at 3 RPM / 10K TPM, which is roughly two hours of pacing. Adding a payment method lifts the
 rate limits while staying inside Voyage's 200M free tokens, so the fix costs nothing but a
 billing-page visit. **Until that run happens, the brain SKU stays unsold.**
+
+### Embedded test, round 3 (2026-07-30). Full corpus, local, keyless. Verdict: 1 of 3.
+
+Ran the full 48-episode corpus with **local embeddings** (`bge-small-en-v1.5` via
+transformers.js, ONNX on CPU). **No API key, no rate limits, no cost.** 4,911 sentence-aware
+chunks with overlap, embedded in 468s for $0.00. Both flaws of round 2 fixed: largest single
+episode is now **4.4%** of the index (was 65%), and top-20 hits span **12 to 13 distinct
+episodes**, so breadth across founders is real.
+
+Results by question, judged strictly:
+
+- **"pricing and how to charge for a product" — GOOD.** 3 of 5 on target. Ellison on setting
+  a per-processor price and issuing a new price list is exactly right; Tony Xu on what
+  DoorDash charged restaurants and whether the wage math worked is right; Bezos on not
+  charging more when they could is right.
+- **"focus and cutting things" — FAILED.** 0 to 1 of 5 on target, and scores compressed into
+  0.595-0.602, which is the retriever signalling it found nothing strong.
+- **"hiring and building a team" — MIXED.** One clear hit (Brad Jacobs on having the right
+  management team and rules of the road that still encourage disagreement), the rest
+  tangential.
+
+**The dominant failure mode is corpus hygiene, not retrieval.** Bad hits are consistently
+David's podcast-framing chatter: outlining the episode, asking a guest before recording,
+requesting a top-10 list. That language is semantically bland, so it matches loosely-worded
+queries. It is also removable. This is the single highest-leverage fix available and it costs
+nothing: strip host meta-talk from the indexed body, the way we already strip ad reads.
+
+**Where that leaves the SKU: still unsold, but the failure is now diagnosed rather than
+mysterious.** Concrete-vocabulary questions work today. Abstract ones ("focus", "cutting")
+do not, because the matching vocabulary is diffuse and the meta-chatter outranks it. Three
+untried levers, cheapest first: (1) filter host meta-talk from the index, (2) add keyword
+fusion and a reranker, which is exactly what gbrain's hybrid RRF pipeline does and which we
+have still never actually run, (3) a larger embedding model.
+
+**One clear product win regardless.** Local keyless embeddings work well enough to be the
+default. The brain export should ship needing **no API key from the buyer at all**, which
+removes the last cost line from the SKU and makes setup "unzip and ask" instead of "go
+register for an embedding provider." Update SETUP.md accordingly when the SKU ships.
