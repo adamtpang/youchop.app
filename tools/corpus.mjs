@@ -19,7 +19,7 @@
  *
  * Per channel it writes: corpus.md (====-delimited), _raw/NNN-slug.txt, manifest.json.
  */
-import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
@@ -219,6 +219,7 @@ async function processChannel(channel, idx) {
     mkdirSync(PAGES, { recursive: true });
     const yaml = (s) => `"${String(s == null ? "" : s).replace(/"/g, '\\"')}"`;
     let timedCount = 0;
+    const written = new Set();
     for (const m of have) {
       const sp = findStaged(m.slug); if (!sp) continue;
       // Prefer a timestamped body: every paragraph gets a deep link to its moment
@@ -234,7 +235,25 @@ async function processChannel(channel, idx) {
       } catch { /* fall through to plain text */ }
       if (!body) body = readFileSync(sp, "utf8");
       const page = `---\ntitle: ${yaml(m.title)}\ntype: transcript\nsource_channel: ${yaml(handle)}\nsource_url: ${yaml(m.url)}\nvideo_id: ${yaml(m.id)}\npublished: ${yaml(m.published)}\nduration_min: ${m.duration_min}\nviews: ${m.views}\nrank: ${m.rank}\nword_count: ${m.words}\ntags: [transcript, youchop, ${slugify(handle.replace("@", ""))}]\n---\n\n# ${m.title}\n\nSource: [${m.title}](${m.url}) · ${m.published} · ${m.duration_min} min · ${m.views.toLocaleString()} views\n\n${body}\n`;
-      writeFileSync(join(PAGES, `${String(m.rank).padStart(3, "0")}-${m.slug}.md`), page, "utf8");
+      const fname = `${String(m.rank).padStart(3, "0")}-${m.slug}.md`;
+      writeFileSync(join(PAGES, fname), page, "utf8");
+      written.add(fname);
+    }
+
+    // Self-cleaning: drop pages left over from earlier runs. Rank prefixes shift
+    // when view counts change, so the same episode can reappear under a new number
+    // and the old file would linger and get indexed twice.
+    // Two deliberate safety properties:
+    //   1. Write first, prune second. An interrupted run leaves stale files (harmless)
+    //      rather than deleting pages it never got around to rewriting.
+    //   2. Only files matching this exporter's own NNN-slug.md pattern are touched,
+    //      so anything you add to pages/ by hand survives untouched.
+    let pruned = 0;
+    if (!opt["no-prune"]) {
+      for (const f of readdirSync(PAGES)) {
+        if (!/^\d{3}-.+\.md$/.test(f) || written.has(f)) continue;
+        try { unlinkSync(join(PAGES, f)); pruned++; } catch { /* leave it */ }
+      }
     }
     const est = Math.round((totalWords * 1.33) / 1e6 * 0.02 * 100) / 100;
     writeFileSync(join(BR, "SETUP.md"),
@@ -271,7 +290,7 @@ your agent query the corpus directly. See the gbrain README for the MCP server c
 These transcripts are the creator's copyrighted work. This brain is private input for
 research and synthesis. Do not republish the transcripts.
 `, "utf8");
-    console.log(`  ▸ brain export: ${have.length} pages (${timedCount} with timestamp deep links) → ${join(BR, "pages")} (embedding est. $${est.toFixed(2)})`);
+    console.log(`  ▸ brain export: ${have.length} pages (${timedCount} with timestamp deep links)${pruned ? `, pruned ${pruned} stale` : ""} → ${join(BR, "pages")} (embedding est. $${est.toFixed(2)})`);
   }
 
   console.log(`\n  ▸ ${name}: ${ok} pulled, ${skipped} staged, ${failed} no-captions · ${have.length} episodes · ${totalWords.toLocaleString()} words`);
