@@ -127,6 +127,46 @@ version of this that could get YouChop sued by the exact creators it wants as cu
 Chapters stay the consumer wedge and the distribution mechanic. Nothing about the extension
 or the chapters product changes.
 
-**Gate before selling it:** run the $0.02 embedded test and confirm conceptual questions
+**Gate before selling it:** run the embedded test and confirm conceptual questions
 return good cited answers. If they do not, this stays an internal tool and the SKU does not
 ship. The evidence above does not yet clear that bar.
+
+### Embedded test, round 2 (2026-07-30). Signal is real. Gate still not passed.
+
+Ran a real vector test with a Voyage key (`voyage-4-lite`, 1024d) over 3 episodes,
+transcript body only, deliberately stripping our own Key-lessons summaries so the test
+measures retrieval over the source rather than over our synthesis. 143 chunks.
+
+**Vector search clearly beats keyword-only.** Keyword returned zero on-target passages for
+conceptual questions. Vector returned genuine hits:
+- "pricing and costs" surfaced Jason Fried on paying attention to costs and saving ~$10M by
+  leaving the cloud. On target.
+- "focus" surfaced the SpaceX "tip of the spear, focus: always identify and attack the
+  biggest constraint" passage. On target.
+- "hiring and talent" surfaced 37signals treating year two as a rehire decision. On target,
+  and the best answer of the run.
+
+**But precision is mediocre and the test is underpowered.** Only 1 to 2 of the top 4 hits per
+question were on target; the rest was noise, including a passage about cars in Malibu
+returned for "focus". Scores for "focus" topped out at 0.248, which is the retriever telling
+us it found little.
+
+Worse, the result set is dominated by one episode. Jason Fried is ~30.8k of the ~47.4k words
+in this 3-episode index, about 65%, so he wins nearly every query on chunk volume alone.
+Rockefeller returned **zero** hits across all three questions despite being the corpus's
+cost-discipline exemplar. A retriever that cannot surface Rockefeller on a costs question is
+not yet answering "what do these founders say about X".
+
+**Read this as a floor, not a verdict on gbrain.** Three separate gbrain blockers (a broken
+Windows shim, a stale global `embedding_disabled` in `~/.gbrain/config.json` that silently
+outranked `--embedding-model`, and token-rate limits) forced the test to bypass gbrain
+entirely. So this measures naive cosine similarity over fixed-width 1800-char chunks with no
+sentence boundaries, no overlap, no reranking, no keyword fusion, and no query expansion.
+gbrain does hybrid RRF plus expansion, which should do materially better. The honest
+conclusion is that the *concept* has signal and the *implementation* is untested.
+
+**The decisive test, and what blocks it:** the full 48-episode corpus through gbrain's own
+hybrid pipeline. That needs ~1.1M tokens embedded, and Voyage's no-payment-method tier caps
+at 3 RPM / 10K TPM, which is roughly two hours of pacing. Adding a payment method lifts the
+rate limits while staying inside Voyage's 200M free tokens, so the fix costs nothing but a
+billing-page visit. **Until that run happens, the brain SKU stays unsold.**
