@@ -48,8 +48,14 @@ hosted search service. That choice is what keeps this line honest.
 
 ### Measured embedding cost
 
-Token counts are real (word counts from the actual corpora, x1.33). Prices are OpenAI
-embedding list rates.
+**In practice this is $0, because Voyage ships a 200M-token free tier.** A 200-video
+catalog needs about 2.7M tokens, roughly 1.3% of that allowance, so a creator can index
+their whole back-catalog without paying anyone. Note that Anthropic does not sell an
+embeddings API at all, so "use Claude for this" is not an option: gbrain accepts OpenAI,
+ZeroEntropy, or Voyage, and Voyage is both the cheapest and the most Claude-adjacent pick.
+
+The table below is the paid fallback, priced at OpenAI list rates, for anyone past the free
+tier. Token counts are real (word counts from the actual corpora, x1.33).
 
 | Corpus | Words | Tokens | `3-small` @ $0.02/M | `3-large` @ $0.13/M |
 |---|---|---|---|---|

@@ -265,7 +265,7 @@ Built with youchop.app. You own this outright.
 ## Setup (about 2 minutes)
 
     bun install -g github:garrytan/gbrain
-    export OPENAI_API_KEY=sk-...          # your key; embedding this corpus costs about $${est.toFixed(2)}
+    export VOYAGE_API_KEY=pa-...          # free: Voyage gives 200M tokens; this corpus is about $${est.toFixed(2)}
     cd ${name}/brain
     gbrain init --pglite
     gbrain import ./pages
