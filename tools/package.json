@@ -1,0 +1,9 @@
+{
+  "name": "youchop-tools",
+  "private": true,
+  "type": "module",
+  "description": "Local tooling for youchop: channel-to-corpus extraction and the keyless brain export. Not part of the deployed site (vercel.json sets installCommand to empty).",
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0"
+  }
+}

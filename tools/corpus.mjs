@@ -23,7 +23,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, unlink
 import { join } from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname } from "node:path";
 
 const TOOLS_DIR = dirname(fileURLToPath(import.meta.url));
@@ -268,6 +268,24 @@ async function processChannel(channel, idx) {
           dependencies: { "@huggingface/transformers": "^4.2.0" } }, null, 2), "utf8");
     } catch (e) { console.log(`  ⚠ could not copy ask.mjs: ${String(e.message || e).slice(0, 60)}`); }
 
+    // Pre-build embeddings.json so the buyer's first question is instant instead of
+    // a multi-minute index build. Uses the exporter's own copy of brain-ask.mjs, so
+    // the chunking that produced these vectors is byte-identical to the chunking
+    // ask.mjs uses at query time. Skipped with --no-prebuild, or when transformers
+    // is not installed here (the export still works; ask.mjs just builds on first run).
+    if (!opt["no-prebuild"]) {
+      try {
+        const ask = await import(pathToFileURL(join(TOOLS_DIR, "brain-ask.mjs")).href);
+        process.stdout.write(`  ▸ pre-building the search index (local, free) ... `);
+        const r = await ask.buildIndex(PAGES, join(BR, "embeddings.json"),
+          (pct) => process.stdout.write(`\r  ▸ pre-building the search index (local, free) ... ${pct}%   `));
+        const mb = (readFileSync(join(BR, "embeddings.json")).length / 1048576).toFixed(1);
+        console.log(`\r  ▸ pre-built index: ${r.chunks.length} chunks in ${r.secs}s, ${mb}MB · buyer's first query is instant`);
+      } catch (e) {
+        console.log(`\r  ⚠ skipped index pre-build (${String(e.message || e).slice(0, 60)}). ask.mjs will build it on first run.`);
+      }
+    }
+
     writeFileSync(join(BR, "SETUP.md"),
 `# ${flat.channel || handle} — corpus brain
 
@@ -279,9 +297,13 @@ You own this outright.
     npm install
     node ask.mjs "what does this channel say about pricing"
 
-That is the whole thing. **No API key, no account, no cloud, no cost.** Embeddings run
-locally on your machine (bge-small-en-v1.5 via ONNX). The first run downloads a ~35MB
-model and builds the index; every run after that is instant. Nothing leaves your computer.
+That is the whole thing. **No API key, no account, no cloud, no cost.**
+
+The search index ships pre-built, so your first question answers immediately rather than
+spending minutes embedding. Searching runs locally on your machine (bge-small-en-v1.5 via
+ONNX); the first run downloads a ~35MB model once. Nothing leaves your computer.
+
+If you edit or add pages, \`ask.mjs\` notices and re-indexes itself.
 
 ## Asking
 
