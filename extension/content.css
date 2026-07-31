@@ -1,0 +1,81 @@
+/* content.css — the injected button and result panel.
+   Everything is prefixed/scoped so it never leaks into YouTube's own styles. */
+
+button.youchop-inject {
+  background: #ff4930;
+  color: #fff;
+  border: 0;
+  border-radius: 18px;
+  font: 600 14px/1 "Roboto", "Segoe UI", sans-serif;
+  padding: 10px 16px;
+  margin-right: 8px;
+  cursor: pointer;
+  height: 36px;
+  transition: filter .15s;
+}
+button.youchop-inject:hover { filter: brightness(1.1); }
+
+#youchop-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: min(560px, calc(100vw - 40px));
+  max-height: min(70vh, 720px);
+  background: #16161c;
+  color: #f2efe9;
+  border: 1px solid #2a2a33;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .55);
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  font-family: "Roboto", "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+#youchop-panel .yc-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid #2a2a33;
+}
+#youchop-panel .yc-brand { font-weight: 800; font-size: 15px; display: flex; align-items: center; }
+#youchop-panel .yc-blade {
+  display: inline-block; width: 3px; height: 15px; background: #ff4930;
+  transform: rotate(14deg); margin: 0 4px; border-radius: 2px;
+}
+#youchop-panel .yc-meta {
+  font-size: 11.5px; color: #8f8d96; flex: 1; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+#youchop-panel .yc-x {
+  background: none; border: 0; color: #8f8d96; font-size: 22px;
+  cursor: pointer; line-height: 1; padding: 0 2px;
+}
+#youchop-panel .yc-x:hover { color: #f2efe9; }
+
+#youchop-panel .yc-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 10px 14px; flex-wrap: wrap;
+}
+#youchop-panel .yc-seg { display: inline-flex; border: 1px solid #2a2a33; border-radius: 8px; overflow: hidden; }
+#youchop-panel .yc-seg button {
+  background: #1c1c24; border: 0; color: #8f8d96;
+  font: 500 12px/1 "Roboto", sans-serif; padding: 8px 12px; cursor: pointer;
+}
+#youchop-panel .yc-seg button.on { background: rgba(255, 73, 48, .16); color: #f2efe9; }
+#youchop-panel .yc-actions { display: flex; gap: 8px; }
+#youchop-panel .yc-btn {
+  border: 0; border-radius: 8px; font: 600 13px/1 "Roboto", sans-serif;
+  padding: 9px 15px; cursor: pointer;
+}
+#youchop-panel .yc-btn.red { background: #ff4930; color: #fff; }
+#youchop-panel .yc-btn.ghost { background: transparent; color: #f2efe9; border: 1px solid #2a2a33; }
+#youchop-panel .yc-btn:hover { filter: brightness(1.12); }
+
+#youchop-panel .yc-out {
+  flex: 1; min-height: 200px; margin: 0 14px 6px; padding: 12px;
+  background: #0f0f14; color: #f2efe9; border: 1px solid #2a2a33; border-radius: 10px;
+  font: 12.5px/1.6 "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  resize: none; white-space: pre-wrap;
+}
+#youchop-panel .yc-foot {
+  padding: 0 14px 12px; font-size: 11.5px; color: #ffb43a; min-height: 14px;
+}

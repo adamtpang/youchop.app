@@ -23,6 +23,10 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, unlink
 import { join } from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+
+const TOOLS_DIR = dirname(fileURLToPath(import.meta.url));
 
 const pexec = promisify(exec);
 const argv = process.argv.slice(2);
@@ -255,42 +259,63 @@ async function processChannel(channel, idx) {
         try { unlinkSync(join(PAGES, f)); pruned++; } catch { /* leave it */ }
       }
     }
-    const est = Math.round((totalWords * 1.33) / 1e6 * 0.02 * 100) / 100;
+    // ship the keyless local search tool alongside the pages
+    try {
+      const askSrc = readFileSync(join(TOOLS_DIR, "brain-ask.mjs"), "utf8");
+      writeFileSync(join(BR, "ask.mjs"), askSrc, "utf8");
+      writeFileSync(join(BR, "package.json"),
+        JSON.stringify({ name: `${name}-brain`, private: true, type: "module",
+          dependencies: { "@huggingface/transformers": "^4.2.0" } }, null, 2), "utf8");
+    } catch (e) { console.log(`  ⚠ could not copy ask.mjs: ${String(e.message || e).slice(0, 60)}`); }
+
     writeFileSync(join(BR, "SETUP.md"),
 `# ${flat.channel || handle} — corpus brain
 
-${have.length} episodes, ${totalWords.toLocaleString()} words, ready to index.
-Built with youchop.app. You own this outright.
+${have.length} episodes, ${totalWords.toLocaleString()} words. Built with youchop.app.
+You own this outright.
 
-## Setup (about 2 minutes)
+## Setup
 
-    bun install -g github:garrytan/gbrain
-    export VOYAGE_API_KEY=pa-...          # free: Voyage gives 200M tokens; this corpus is about $${est.toFixed(2)}
-    cd ${name}/brain
-    gbrain init --pglite
-    gbrain import ./pages
+    npm install
+    node ask.mjs "what does this channel say about pricing"
 
-PGLite means no server and no Docker. Everything stays on your machine.
+That is the whole thing. **No API key, no account, no cloud, no cost.** Embeddings run
+locally on your machine (bge-small-en-v1.5 via ONNX). The first run downloads a ~35MB
+model and builds the index; every run after that is instant. Nothing leaves your computer.
 
-## Ask it things
+## Asking
 
-    gbrain query "what does this channel say about pricing"
-    gbrain search "exact phrase"
+    node ask.mjs "how do they think about hiring"
+    node ask.mjs "pricing" --top 10
+    node ask.mjs "focus" --raw          # allow several hits from one episode
+    node ask.mjs --rebuild              # re-index after adding pages
 
-Every answer cites the episode it came from, and each page's frontmatter carries the
-source_url so you can jump back to the video.
+Each answer cites the episode and, where the page carries timestamps, links straight to
+the moment in the video.
 
-## Use it from your own agent
+## What is in here
 
-gbrain speaks MCP, so you can point Claude Code or any MCP client at this brain and let
-your agent query the corpus directly. See the gbrain README for the MCP server command.
+    pages/       one markdown file per episode, with frontmatter and a source link.
+                 Paragraphs are headed by timestamped deep links, so any passage you
+                 find points back to the exact second it came from.
+    ask.mjs      the local search tool above.
+
+The pages are plain markdown. Nothing is locked in: drop them into Obsidian, grep them,
+paste them into any LLM, or index them with another tool.
+
+## Optional: use it from an AI agent
+
+The pages work as-is with any tool that reads markdown. If you want a heavier setup with
+a knowledge graph and MCP support, gbrain (github.com/garrytan/gbrain, MIT) can index
+\`pages/\`, though it requires a paid embedding provider (OpenAI, Voyage, or ZeroEntropy)
+because it does not support local embeddings.
 
 ## Note on the source material
 
 These transcripts are the creator's copyrighted work. This brain is private input for
 research and synthesis. Do not republish the transcripts.
 `, "utf8");
-    console.log(`  ▸ brain export: ${have.length} pages (${timedCount} with timestamp deep links)${pruned ? `, pruned ${pruned} stale` : ""} → ${join(BR, "pages")} (embedding est. $${est.toFixed(2)})`);
+    console.log(`  ▸ brain export: ${have.length} pages (${timedCount} with timestamp deep links)${pruned ? `, pruned ${pruned} stale` : ""} → ${join(BR, "pages")} · keyless local search via ask.mjs`);
   }
 
   console.log(`\n  ▸ ${name}: ${ok} pulled, ${skipped} staged, ${failed} no-captions · ${have.length} episodes · ${totalWords.toLocaleString()} words`);
