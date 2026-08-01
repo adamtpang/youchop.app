@@ -155,42 +155,63 @@ const YC = {
       .filter(Boolean);
     if (rows.length) { YC.lastPanelStrategy = "class-variant"; return rows; }
 
-    // 3. structural: inside the transcript panel, any leaf row whose text starts
-    //    with a timestamp. Survives renames because it assumes almost nothing.
-    const panel =
-      document.querySelector("ytd-transcript-renderer") ||
-      document.querySelector("ytd-engagement-panel-section-list-renderer[target-id*='transcript']") ||
-      document.querySelector("[target-id*='searchable-transcript']");
-    if (panel) {
-      const seen = new Set();
-      rows = [];
-      for (const el of panel.querySelectorAll("div, li, button, span, yt-formatted-string")) {
-        const txt = (el.textContent || "").trim();
-        const m = txt.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(\S[\s\S]{0,600})$/);
-        if (!m) continue;
-        // keep the tightest element for each timestamp (skip wrapping containers)
-        if (seen.has(m[1]) ) continue;
-        if (el.querySelector("div, li, button")) continue;
-        seen.add(m[1]);
-        const r = mk(m[1], m[2].replace(/\s+/g, " "));
-        if (r) rows.push(r);
-      }
-      if (rows.length) { YC.lastPanelStrategy = "structural"; return rows; }
+    // 3. structural, DOCUMENT-WIDE. Deliberately not scoped to a container:
+    //    guessing which element wraps the transcript is what broke strategies 1
+    //    and 2. A transcript is simply the largest cluster of sibling rows whose
+    //    text begins with a timestamp, so find that instead of naming anything.
+    const hits = YC.timestampRows();
+    if (hits.rows.length >= 5) {
+      YC.lastPanelStrategy = `structural (${hits.rows.length} rows under ${hits.where})`;
+      return hits.rows;
     }
 
     YC.lastPanelStrategy = null;
     return null;
   },
 
+  /* Every leaf element in the document whose text starts with a timestamp,
+     grouped by parent; the biggest group is the transcript. Chapter lists and
+     timestamped comments form much smaller groups, so size disambiguates them
+     without depending on any YouTube class name. */
+  timestampRows() {
+    const byParent = new Map();
+    const RX = /^(\d{1,2}:\d{2}(?::\d{2})?)\s+(\S[\s\S]{0,800})$/;
+    for (const el of document.querySelectorAll("div, li, button, span, yt-formatted-string, a")) {
+      if (el.querySelector("div, li, button")) continue;      // leaf-ish rows only
+      const m = (el.textContent || "").trim().match(RX);
+      if (!m) continue;
+      const key = el.parentElement || el;
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key).push({ stamp: m[1], text: m[2].replace(/\s+/g, " ") });
+    }
+    let best = [], bestKey = null;
+    for (const [k, v] of byParent) if (v.length > best.length) { best = v; bestKey = k; }
+    const seen = new Set(), rows = [];
+    for (const r of best) {
+      const sec = YC.toSec(r.stamp);
+      if (sec === null || seen.has(sec)) continue;
+      seen.add(sec);
+      rows.push({ t: sec, text: r.text });
+    }
+    rows.sort((a, b) => a.t - b.t);
+    return { rows, where: bestKey ? (bestKey.tagName || "?").toLowerCase() : "none", groups: byParent.size };
+  },
+
   /* What the page looks like right now, for honest error reporting. */
   panelDiagnostics() {
     const q = (s) => document.querySelectorAll(s).length;
-    const panel = document.querySelector("ytd-transcript-renderer, ytd-engagement-panel-section-list-renderer[target-id*='transcript']");
+    const panels = [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
+      .map((p) => `${p.getAttribute("target-id") || "?"}=${(p.getAttribute("visibility") || "?").replace("ENGAGEMENT_PANEL_VISIBILITY_", "")}`)
+      .filter((s) => /transcript/i.test(s));
+    let ts = { rows: [], where: "n/a", groups: 0 };
+    try { ts = YC.timestampRows(); } catch {}
     return {
       segmentEls: q("ytd-transcript-segment-renderer"),
       classVariants: q('[class*="transcript-segment"], [class*="segment-renderer"]'),
-      panelPresent: !!panel,
-      panelVisibility: panel?.getAttribute?.("visibility") || "n/a",
+      transcriptPanels: panels.length ? panels.join(", ") : "none",
+      timestampRowsFound: ts.rows.length,
+      timestampRowsUnder: ts.where,
+      timestampGroups: ts.groups,
       strategy: YC.lastPanelStrategy || "none matched",
       duration: YC.videoDuration(),
     };
@@ -355,11 +376,15 @@ const YC = {
         const net = /failed to fetch|networkerror|load failed/i.test(String(e.message || e));
         const err = new Error(
           "Could not read the transcript.\n" +
-          `panel: ${d.panelPresent ? "present" : "not found"} (${d.panelVisibility}), ` +
-          `${d.segmentEls} segment elements, ${d.classVariants} class variants, strategy: ${d.strategy}\n` +
+          `panels: ${d.transcriptPanels}\n` +
+          `elements: ${d.segmentEls} segment, ${d.classVariants} class-variant\n` +
+          `timestamp rows in page: ${d.timestampRowsFound} (under <${d.timestampRowsUnder}>, ${d.timestampGroups} groups)\n` +
+          `strategy: ${d.strategy}\n` +
           `captions: ${YC.lastCaptionNote || "not reached"}\n` +
-          `youchop.app: ${net ? "blocked (reload the extension to pick up host permissions)" : String(e.message || e)}\n` +
-          "If the transcript panel is open and this still fails, the panel markup changed; send this text."
+          `youchop.app: ${net ? "BLOCKED. Remove and re-add the extension so Chrome grants the new host permission (a plain reload does not always do it)." : String(e.message || e)}\n` +
+          (d.timestampRowsFound === 0
+            ? "No timestamped rows exist in the page at all, so the transcript is not open. Click Show transcript under the video, confirm you can see the lines, then click Chop."
+            : "Timestamped rows exist but were not recognised; send this text.")
         );
         err.diagnostics = d;
         throw err;
