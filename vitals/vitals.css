@@ -1,4 +1,4 @@
-/* vitals.css — styles for the Vitals dashboard.
+/* vitals.css, styles for the Vitals dashboard.
    Everything is scoped under .vitals so importing this into a host app never
    touches the host's own body or elements. */
 .vitals {

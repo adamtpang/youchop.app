@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouChop — Chapterize one YouTube video (free self-serve)</title>
+<meta name="description" content="Paste a YouTube link. Get ready-to-paste description chapters in seconds — topic titles from the transcript, starting at 0:00 for Google Key Moments." />
+<meta name="keywords" content="youtube chapter generator, auto generate youtube chapters, free youtube timestamps, paste youtube chapters description" />
+<link rel="canonical" href="https://youchop.app/chop" />
+<meta property="og:title" content="YouChop — chapterize one video, free" />
+<meta property="og:description" content="Paste a YouTube URL. Copy description-ready chapters. Same path we use for creator packs." />
+<meta property="og:url" content="https://youchop.app/chop" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://youchop.app/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="site.css" />
+<style>
+  .chop-meta { margin-top: 18px; font-family: var(--mono); font-size: 12.5px; color: var(--mut); display: none; }
+  .chop-meta.show { display: block; }
+  .chapter-list { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
+  .chapter-row { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .chapter-row:last-child { border-bottom: none; }
+  .chapter-row .ts { font-family: var(--mono); color: var(--amber); font-size: 13px; padding-top: 2px; }
+  .paste-box {
+    margin-top: 14px; width: 100%; min-height: 180px; resize: vertical;
+    background: var(--bg2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 18px; font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
+  }
+  .paste-box:focus { outline: none; border-color: var(--amber); }
+  .engine-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11.5px; color: var(--mut);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; margin-right: 8px;
+  }
+  .engine-pill b { color: var(--ink); font-weight: 500; }
+  .hint-row { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="glow" style="top:-180px; left:20%; width:560px; height:460px; background:var(--amber); opacity:.12"></div>
+
+<div class="wrap">
+  <nav>
+    <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
+    <div class="navlinks">
+      <a href="/chop" style="color:var(--ink)">Chapterize</a>
+      <a href="/extract">Channel → Text</a>
+      <a href="/creators" class="creator-link">For creators →</a>
+    </div>
+  </nav>
+
+  <header class="tool-hero">
+    <div class="kicker">Creator self-serve · one video</div>
+    <h1 style="font-size:clamp(36px,5.6vw,64px); font-weight:800; letter-spacing:-.035em; line-height:1.05; max-width:16ch">
+      Paste a link. Get <span class="amber">chapters</span>.
+    </h1>
+    <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:58ch; line-height:1.6">
+      Ready-to-paste description text — starts at <strong style="color:var(--ink)">0:00</strong> so Google can index
+      <strong style="color:var(--ink)">Key Moments</strong>. Same unit of work as the $99 back-catalog pack; this page does one video free.
+    </p>
+
+    <div class="input-row" style="margin-top:28px">
+      <input class="tool-input" id="url-input" placeholder="https://youtube.com/watch?v=…   —   after your mp4 is on YouTube" autocomplete="off" />
+      <button class="btn btn-amber" id="chop-btn">Chapterize</button>
+    </div>
+    <p class="input-hint">Needs captions (YouTube auto-captions count). We never post to your channel — you paste.</p>
+    <div class="err-box" id="err"></div>
+  </header>
+
+  <div class="out-panel" id="out-panel">
+    <div class="out-bar">
+      <div class="out-stats">
+        <b id="stat-count">0</b> chapters · <span id="stat-title" class="muted"></span>
+      </div>
+      <div class="out-controls">
+        <button class="btn btn-ghost btn-sm" id="copy-btn">Copy for description</button>
+        <button class="btn btn-amber btn-sm" id="copy-credit-btn">Copy + credit</button>
+      </div>
+    </div>
+
+    <div class="chop-meta" id="meta"></div>
+    <div class="chapter-list" id="chapter-list"></div>
+    <textarea class="paste-box" id="paste-box" readonly spellcheck="false"></textarea>
+    <div class="hint-row">
+      <span class="engine-pill">Paste into YouTube Studio → Details → Description</span>
+      <span class="engine-pill">Edit any title first — it's yours</span>
+    </div>
+    <p class="input-hint" style="margin-top:18px">
+      Whole channel? <a href="/creators" style="color:var(--amber)">$99 for up to 200 videos</a>
+      · Research dump? <a href="/extract" style="color:var(--ink)">Channel → Text</a>
+    </p>
+  </div>
+
+  <section style="padding:70px 0 40px">
+    <div class="kicker">After upload</div>
+    <h2 class="reveal">mp4 → YouTube → captions → this page → paste.</h2>
+    <div class="steps" style="margin-top:44px">
+      <div class="step reveal">
+        <div class="num">1</div>
+        <h3>Wait for captions</h3>
+        <p>YouTube usually has auto-captions within minutes of processing. No captions = no chapters.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">2</div>
+        <h3>Chapterize</h3>
+        <p>We pull the timed transcript and write topic titles — not “Introduction / Main Discussion”.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">3</div>
+        <h3>Paste once</h3>
+        <p>Description chapters unlock Key Moments in Google. You own the text forever.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <a class="wordmark" href="/" style="font-size:17px">You<span class="blade" style="height:16px"></span>Chop</a>
+      <p style="margin-top:10px">Real chapters for every YouTube video.</p>
+    </div>
+    <div class="flinks">
+      <a href="/">For viewers</a>
+      <a href="/extract">Channel → Text</a>
+      <a href="/creators">For creators</a>
+      <a href="mailto:adamtpang@gmail.com">Contact</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:30px; font-family:var(--mono); font-size:11.5px">© 2026 YouChop · built by <a href="https://adampang.com">Adam Pang</a> · not affiliated with YouTube</div>
+</footer>
+
+<div class="toast" id="toast">Copied</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var last = null;
+
+  function showErr(msg, detail) {
+    var e = $("err");
+    e.innerHTML = msg + (detail ? ' <code>' + detail + '</code>' : "");
+    e.classList.add("show");
+  }
+  function clearErr() { $("err").classList.remove("show"); }
+  function toast(t) {
+    var el = $("toast"); el.textContent = t; el.classList.add("show");
+    setTimeout(function () { el.classList.remove("show"); }, 1400);
+  }
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  async function run() {
+    clearErr();
+    var url = $("url-input").value.trim();
+    if (!url) return showErr("Paste a YouTube link or 11-character video ID.");
+    $("chop-btn").textContent = "Chapterizing…";
+    $("chop-btn").disabled = true;
+    $("out-panel").classList.remove("show");
+    try {
+      var r = await fetch("/api/chapterize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url }),
+      });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        var msg = d.message || d.error || ("Request failed (" + r.status + ")");
+        if (d.error === "no_transcript") msg = "No captions yet for that video. Wait for YouTube auto-captions, then retry.";
+        if (d.error === "no_provider") msg = "Transcript backend not configured on the server.";
+        if (d.error === "missing_video") msg = "That doesn't look like a YouTube link.";
+        return showErr(msg, d.detail ? String(d.detail).slice(0, 160) : "");
+      }
+      last = d;
+      render(d);
+      // Activation signal: first successful chapterize in this browser
+      try {
+        if (!localStorage.getItem("yc_activated")) {
+          localStorage.setItem("yc_activated", String(Date.now()));
+          localStorage.setItem("yc_activated_video", d.videoId || "");
+        }
+        var n = Number(localStorage.getItem("yc_chop_count") || "0") + 1;
+        localStorage.setItem("yc_chop_count", String(n));
+      } catch (e) { /* private mode */ }
+    } catch (e) {
+      showErr("Network error.", String(e.message || e));
+    } finally {
+      $("chop-btn").textContent = "Chapterize";
+      $("chop-btn").disabled = false;
+    }
+  }
+
+  function render(d) {
+    $("stat-count").textContent = (d.chapters || []).length;
+    $("stat-title").textContent = d.title ? ("· " + d.title) : (d.videoId ? "· " + d.videoId : "");
+    $("meta").innerHTML =
+      '<span class="engine-pill">engine <b>' + esc(d.engine || "?") + '</b></span>' +
+      '<span class="engine-pill">transcript <b>' + esc(d.transcriptProvider || "?") + '</b></span>' +
+      (d.author ? '<span class="engine-pill">channel <b>' + esc(d.author) + '</b></span>' : "") +
+      (d.model ? '<span class="engine-pill">model <b>' + esc(d.model) + '</b></span>' : "");
+    $("meta").classList.add("show");
+
+    var list = $("chapter-list");
+    list.innerHTML = (d.chapters || []).map(function (c) {
+      return '<div class="chapter-row"><div class="ts">' + esc(c.timestamp) + '</div><div>' + esc(c.title) + '</div></div>';
+    }).join("");
+    $("paste-box").value = d.paste || "";
+    $("out-panel").classList.add("show");
+    $("out-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function copy(text, label) {
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast(label || "Copied"); }).catch(fallback);
+    } else fallback();
+    function fallback() {
+      $("paste-box").select();
+      try { document.execCommand("copy"); toast(label || "Copied"); } catch (e) { toast("Select and copy manually"); }
+    }
+  }
+
+  $("chop-btn").onclick = run;
+  $("url-input").addEventListener("keydown", function (e) { if (e.key === "Enter") run(); });
+  $("copy-btn").onclick = function () { copy(last && last.paste, "Copied for description"); };
+  $("copy-credit-btn").onclick = function () { copy(last && last.pasteWithCredit, "Copied with credit"); };
+
+  // Prefill ?v= / ?url=
+  try {
+    var q = new URLSearchParams(location.search);
+    var pre = q.get("url") || q.get("v") || q.get("id");
+    if (pre) { $("url-input").value = pre; if (q.get("auto") === "1") run(); }
+  } catch (e) {}
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) { if (en.isIntersecting) en.target.classList.add("in"); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

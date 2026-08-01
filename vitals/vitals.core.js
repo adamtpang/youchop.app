@@ -1,4 +1,4 @@
-/* vitals.core.js — the framework-agnostic Vitals renderer.
+/* vitals.core.js, the framework-agnostic Vitals renderer.
  *
  * UMD: loads as a plain <script> (sets window.Vitals), and imports as a
  * module in bundlers (Vite/Next/etc).

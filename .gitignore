@@ -3,7 +3,7 @@ node_modules/
 .vercel/
 .env*
 !.env.example
-# vitals finances are real — keep local
+# vitals finances are real , keep local
 # vitals/vitals.data.js
 
 .vercel

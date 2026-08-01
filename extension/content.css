@@ -1,4 +1,4 @@
-/* content.css — the injected button and result panel.
+/* content.css, the injected button and result panel.
    Everything is prefixed/scoped so it never leaks into YouTube's own styles. */
 
 button.youchop-inject {

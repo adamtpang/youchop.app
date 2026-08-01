@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ask.mjs — ask your corpus questions. Local, keyless, free.
+ * ask.mjs, ask your corpus questions. Local, keyless, free.
  *
  *   npm install
  *   node ask.mjs "what does this channel say about pricing"

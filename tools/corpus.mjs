@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * youchop corpus builder — turn whole YouTube channels into text corpora.
+ * youchop corpus builder, turn whole YouTube channels into text corpora.
  *
  *   node tools/corpus.mjs @AlexHormozi @bretthall9080 --local --top all --out ".../knowledge"
  *
@@ -9,12 +9,12 @@
  * Modes:
  *   --local   pull YouTube's own captions with yt-dlp on THIS machine (residential IP):
  *             free, no API key, no provider quota. Best for bulk corpus building.
- *   (default) hosted /api/transcripts (uses provider quota) — for parity with the website.
+ *   (default) hosted /api/transcripts (uses provider quota), for parity with the website.
  *
  * Flags: --top N|all (default 20) · --min-minutes N (default 20) · --out DIR
  *        --name SLUG (single channel only) · --pause MS (default 900) · --endpoint URL
  *
- * Resume: idempotent by CONTENT — an episode already in <corpus>/_raw (matched by slug,
+ * Resume: idempotent by CONTENT, an episode already in <corpus>/_raw (matched by slug,
  * any rank prefix) is skipped. Re-run the exact command to resume after a stop.
  *
  * Per channel it writes: corpus.md (====-delimited), _raw/NNN-slug.txt, manifest.json.
@@ -187,7 +187,7 @@ async function processChannel(channel, idx) {
     } else {
       try {
         const r = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [m.id], lang: "en" }) });
-        if ([402, 403, 429].includes(r.status)) { console.log(`\n  ⛔ provider cap (HTTP ${r.status}). Stopping — re-run to resume.`); break; }
+        if ([402, 403, 429].includes(r.status)) { console.log(`\n  ⛔ provider cap (HTTP ${r.status}). Stopping, re-run to resume.`); break; }
         const d = await r.json().catch(() => null); const t = d?.transcripts?.[0];
         text = t?.ok ? t.text : ""; if (t?.title) m.title = t.title;
       } catch (e) { text = ""; }
@@ -206,9 +206,9 @@ async function processChannel(channel, idx) {
   const have = manifest.filter((m) => m.words);
   writeFileSync(join(OUT, "manifest.json"), JSON.stringify({ channel: handle, name, generated: process.env.CORPUS_DATE || "", total_longform: totalLong, episodes: manifest }, null, 1), "utf8");
   const totalWords = have.reduce((s, m) => s + m.words, 0);
-  let corpus = `# ${flat.channel || handle} — transcript corpus\n\n${have.length} episodes · ${totalWords.toLocaleString()} words · source: ${handle}\n` +
+  let corpus = `# ${flat.channel || handle}, transcript corpus\n\n${have.length} episodes · ${totalWords.toLocaleString()} words · source: ${handle}\n` +
     `Extracted with youchop.app. Each episode delimited by ====.\n` +
-    `NOTE: the creator's copyrighted work — PRIVATE input for research/synthesis, not for republication.\n\n`;
+    `NOTE: the creator's copyrighted work, PRIVATE input for research/synthesis, not for republication.\n\n`;
   for (const m of have.sort((a, b) => a.rank - b.rank)) {
     const sp = findStaged(m.slug); if (!sp) continue;
     corpus += `\n==== [${m.rank}] ${m.title} ====\n${m.url} · ${m.published} · ${m.duration_min} min · ${m.views.toLocaleString()} views\n\n${readFileSync(sp, "utf8")}\n`;
@@ -293,7 +293,7 @@ async function processChannel(channel, idx) {
     }
 
     writeFileSync(join(BR, "SETUP.md"),
-`# ${flat.channel || handle} — corpus brain
+`# ${flat.channel || handle}, corpus brain
 
 ${have.length} episodes, ${totalWords.toLocaleString()} words. Built with youchop.app.
 You own this outright.

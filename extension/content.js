@@ -1,4 +1,4 @@
-/* content.js — injects the one-click Chop button into YouTube's own action row
+/* content.js, injects the one-click Chop button into YouTube's own action row
    and renders the result in a panel. All work happens locally in this tab. */
 (function () {
   "use strict";

@@ -1,4 +1,4 @@
-/* popup.js — mirrors the in-page button for people who prefer the toolbar icon.
+/* popup.js, mirrors the in-page button for people who prefer the toolbar icon.
    It just asks the content script on the active tab to open its panel. */
 (async () => {
   const msg = document.getElementById("msg");

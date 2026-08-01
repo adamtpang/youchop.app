@@ -32,7 +32,7 @@ function thumb(sn) {
 
 function sample(q) {
   return { candidates: [
-    { channelId: "UCdemo0000000000000001", title: q + " (demo result)", description: "Sample channel — real results need a free YouTube Data API key.", thumb: "" },
+    { channelId: "UCdemo0000000000000001", title: q + " (demo result)", description: "Sample channel, real results need a free YouTube Data API key.", thumb: "" },
     { channelId: "UCdemo0000000000000002", title: q + " Clips", description: "Another sample channel.", thumb: "" },
   ], mock: true };
 }

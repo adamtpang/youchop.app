@@ -2,7 +2,7 @@
 // Pluggable transcript backends with automatic fallback:
 //   TRANSCRIPT_PROVIDER = "apify" | "supadata" | "ytio"  forces one provider;
 //   otherwise every configured provider is tried in order apify -> supadata -> ytio
-//   (a provider that errors — e.g. monthly credits exhausted — falls through to the next).
+//   (a provider that errors, e.g. monthly credits exhausted, falls through to the next).
 //   - apify:    APIFY_TOKEN (free $5/mo credits). Actor runs on Apify's infra, which
 //               survives YouTube's datacenter-IP blocking that kills scraping on Vercel.
 //               Actor: karamelo/youtube-transcripts (override APIFY_TRANSCRIPT_ACTOR).
@@ -11,7 +11,7 @@
 //               or [string] (captions).
 //   - supadata: SUPADATA_API_KEY (free 100 transcripts/mo, no card). One request per video:
 //               GET api.supadata.ai/v1/transcript?url=…  (x-api-key header).
-//   - ytio:     YT_TRANSCRIPT_TOKEN — youtube-transcript.io (paid, optional).
+//   - ytio:     YT_TRANSCRIPT_TOKEN, youtube-transcript.io (paid, optional).
 // Batches capped at 50 ids. Mock mode needs no key.
 
 const YTIO_BASE = "https://www.youtube-transcript.io/api";
@@ -120,7 +120,7 @@ async function viaSupadata(ids, withTs, debug, lang) {
   const CONC = 4;
   const fetchOne = async (id, useLang) => {
     // Videos with many translated tracks (e.g. TED talks) return an arbitrary
-    // language when none is specified — so we ALWAYS ask for the preferred
+    // language when none is specified, so we ALWAYS ask for the preferred
     // language first, then retry without it if that track doesn't exist.
     const qs = "url=" + encodeURIComponent("https://www.youtube.com/watch?v=" + id)
       + (useLang ? "&lang=" + encodeURIComponent(lang) : "")
@@ -140,7 +140,7 @@ async function viaSupadata(ids, withTs, debug, lang) {
       if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
       let out = r.ok ? normalizeSupadata(id, data, withTs) : null;
       if (!out || !out.ok) {
-        // preferred language track missing — take whatever the video has
+        // preferred language track missing, take whatever the video has
         r = await fetchOne(id, false);
         data = await r.json().catch(() => null);
         if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
@@ -227,29 +227,33 @@ function providerChain() {
   return chain;
 }
 
-module.exports = async (req, res) => {
-  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  const body = await readJson(req);
-  const ids = Array.isArray(body.ids) ? body.ids.slice(0, 50) : [];
-  const withTs = !!body.timestamps;
-
-  if (body.mock) return res.status(200).json({ transcripts: mock(ids, withTs), provider: "mock" });
-  if (!ids.length) return res.status(400).json({ error: "Provide an 'ids' array of YouTube video IDs (max 50)." });
+/** Programmatic entry used by /api/chapterize and the HTTP handler. */
+async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock }) {
+  const list = Array.isArray(ids) ? ids.slice(0, 50) : [];
+  const withTs = !!timestamps;
+  if (useMock) return { ok: true, transcripts: mock(list, withTs), provider: "mock" };
+  if (!list.length) return { ok: false, status: 400, body: { error: "Provide an 'ids' array of YouTube video IDs (max 50)." } };
 
   const chain = providerChain();
-  if (!chain.length) return res.status(500).json({ error: "no_provider", message: "No transcript backend configured. Set APIFY_TOKEN or SUPADATA_API_KEY (both free) or YT_TRANSCRIPT_TOKEN." });
+  if (!chain.length) {
+    return {
+      ok: false,
+      status: 500,
+      body: { error: "no_provider", message: "No transcript backend configured. Set APIFY_TOKEN or SUPADATA_API_KEY (both free) or YT_TRANSCRIPT_TOKEN." },
+    };
+  }
 
-  const lang = typeof body.lang === "string" && /^[a-zA-Z-]{2,8}$/.test(body.lang) ? body.lang : "en";
+  const preferredLang = typeof lang === "string" && /^[a-zA-Z-]{2,8}$/.test(lang) ? lang : "en";
   let lastError = null;
   const attempted = [];
   for (const name of chain) {
     try {
-      const result = await PROVIDERS[name](ids, withTs, body.debug, lang);
+      const result = await PROVIDERS[name](list, withTs, debug, preferredLang);
       if (!result.error) {
         result.provider = name;
         if (attempted.length) result.fellBackFrom = attempted;
         await enrichTitles(result.transcripts);
-        return res.status(200).json(result);
+        return { ok: true, ...result };
       }
       lastError = result.error;
       attempted.push(name);
@@ -259,5 +263,23 @@ module.exports = async (req, res) => {
     }
   }
   lastError.body.attempted = attempted;
-  return res.status(lastError.status).json(lastError.body);
+  return { ok: false, status: lastError.status, body: lastError.body };
+}
+
+module.exports = async (req, res) => {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  const body = await readJson(req);
+  const result = await fetchTranscripts({
+    ids: body.ids,
+    timestamps: body.timestamps,
+    debug: body.debug,
+    lang: body.lang,
+    mock: body.mock,
+  });
+  if (!result.ok) return res.status(result.status).json(result.body);
+  const { ok, status, body: _b, ...payload } = result;
+  return res.status(200).json(payload);
 };
+module.exports.fetchTranscripts = fetchTranscripts;
+module.exports.parseVideoId = vidFromUrl;
+module.exports.hms = hms;

@@ -1,5 +1,12 @@
+<!-- BEGIN:summon-standard -->
+Summon standard: this company must pass the six readiness gates in `summon.company/SUMMON_COMPANY_STANDARD.md` (Outcome, Evidence, Workspace, Organization, Skills, Runtime). Read `NORTH_STAR.md`, `EVIDENCE.md`, `company/ORGANIZATION.md`.
+<!-- END:summon-standard -->
+
+<!-- BEGIN:grok-chat-continuation -->
+Grok chat continuation: read `GROK_CONTINUE_FROM_CLAUDE.md` and/or `GROK_CONTINUE_FROM_CODEX.md` when resuming in Grok. Refresh with `node .grok/sync-to-grok.js` from Aether root.
+<!-- END:grok-chat-continuation -->
 <!-- BEGIN:claude-chat-continuation -->
-Claude chat continuation: read `CODEX_CONTINUE_FROM_CLAUDE.md` to resume from the latest local Claude Code sessions for this project.
+Claude chat continuation: read `ANTIGRAVITY_CONTINUE_FROM_CLAUDE.md` to resume from the latest local Claude sessions for this project.
 <!-- END:claude-chat-continuation -->
 
 <!-- BEGIN:claude-codex-sync -->
@@ -47,7 +54,7 @@ Source: `README.md`
 ```markdown
 # YouChop
 
-**Real chapters for every YouTube video.** A Chrome extension that reads a video's transcript and renders AI-generated, clickable chapters in YouTube's own player UI (seekbar segments + chapter list) — plus a creator service that chapterizes entire back-catalogs.
+**Real chapters for every YouTube video.** A Chrome extension that reads a video's transcript and renders AI-generated, clickable chapters in YouTube's own player UI (seekbar segments + chapter list), plus a creator service that chapterizes entire back-catalogs.
 
 - Live site: https://youchop.app · Creator offer: https://youchop.app/creators
 - Company dashboard: [`vitals/index.html`](vitals/index.html) (open locally, or `/vitals` when deployed)
@@ -65,16 +72,16 @@ Source: `README.md`
 
 ## Current state (2026-07-02)
 
-**This is a rebuild.** The original Next.js app + extension source lived in `adamtpang/youchop.app` on GitHub, which was deleted; only the Vercel deployment survived (source unrecoverable for git deploys). Check [github.com/settings/deleted_repositories](https://github.com/settings/deleted_repositories) — if the repo is still restorable, the extension source comes back with it.
+**This is a rebuild.** The original Next.js app + extension source lived in `adamtpang/youchop.app` on GitHub, which was deleted; only the Vercel deployment survived (source unrecoverable for git deploys). Check [github.com/settings/deleted_repositories](https://github.com/settings/deleted_repositories), if the repo is still restorable, the extension source comes back with it.
 
 - Extension: built historically, **never published** to the Chrome Web Store; source lost pending repo restore (else rebuild).
 - The old deployed site's `/credits` page still says "Chaptr" (previous name) and its purchase buttons have no backend.
-- Business model: **creator-revenue-first**. Presell the $99 pack with manual fulfillment starting now; the viewer extension is distribution, samples, and proof — not the business.
+- Business model: **creator-revenue-first**. Presell the $99 pack with manual fulfillment starting now; the viewer extension is distribution, samples, and proof, not the business.
 
 ## Config swap-ins (search for these)
 
-- `CHROME_STORE_URL` in `index.html` — set when the extension is published (until then the CTA degrades to an honest early-access mailto).
-- `STRIPE_PACK_URL` in `creators.html` — set when the Stripe Payment Link exists (until then CTAs are mailto, which *is* the manual-fulfillment flow).
+- `CHROME_STORE_URL` in `index.html`, set when the extension is published (until then the CTA degrades to an honest early-access mailto).
+- `STRIPE_PACK_URL` in `creators.html`, set when the Stripe Payment Link exists (until then CTAs are mailto, which *is* the manual-fulfillment flow).
 
 ## Operating the dashboard
 

@@ -1,4 +1,4 @@
-/* lib.js — transcript extraction, shared by the content script and popup.
+/* lib.js, transcript extraction, shared by the content script and popup.
  *
  * The whole trick: this runs in the user's own browser on their own residential
  * IP, so YouTube serves captions normally. No API key, no proxy, no server, and

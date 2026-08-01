@@ -14,7 +14,7 @@ deep links, plus copy and download.
 
 `lib.js` tries three sources in order:
 
-1. **YouTube's own transcript panel — CONFIRMED WORKING in real Chrome (2026-08-01).**
+1. **YouTube's own transcript panel, CONFIRMED WORKING in real Chrome (2026-08-01).**
    Free, local, nothing leaves the machine. The extension opens the panel itself, then reads
    the rendered DOM. This is reliable precisely because YouTube fetched the data with its own
    valid tokens; we only read what it drew.
