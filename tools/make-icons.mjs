@@ -91,9 +91,43 @@ function render(S) {
   return img;
 }
 
+const made = {};
 for (const size of [16, 32, 48, 128]) {
   const buf = png(size, size, render(size));
+  made[size] = buf;
   writeFileSync(join(OUT, `icon${size}.png`), buf);
   console.log(`  icon${size}.png  ${buf.length} bytes`);
 }
 console.log(`icons written to ${OUT}`);
+
+/* favicon.ico for the site. Browsers and crawlers still request /favicon.ico by
+   name even when an SVG is declared, so serve a real one rather than a 404.
+   ICO is a container: a 6-byte header, one 16-byte directory entry per image,
+   then the payloads. PNG payloads are valid in ICO and keep the file small. */
+function ico(pngs) {
+  const sizes = Object.keys(pngs).map(Number).sort((a, b) => a - b);
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);            // reserved
+  header.writeUInt16LE(1, 2);            // 1 = icon
+  header.writeUInt16LE(sizes.length, 4);
+  const dir = Buffer.alloc(16 * sizes.length);
+  let offset = 6 + dir.length;
+  sizes.forEach((s, i) => {
+    const b = i * 16;
+    dir[b] = s >= 256 ? 0 : s;           // width  (0 means 256)
+    dir[b + 1] = s >= 256 ? 0 : s;       // height
+    dir[b + 2] = 0;                      // palette size
+    dir[b + 3] = 0;                      // reserved
+    dir.writeUInt16LE(1, b + 4);         // colour planes
+    dir.writeUInt16LE(32, b + 6);        // bits per pixel
+    dir.writeUInt32LE(pngs[s].length, b + 8);
+    dir.writeUInt32LE(offset, b + 12);
+    offset += pngs[s].length;
+  });
+  return Buffer.concat([header, dir, ...sizes.map((s) => pngs[s])]);
+}
+
+const SITE = join(dirname(fileURLToPath(import.meta.url)), "..");
+const icoBuf = ico({ 16: made[16], 32: made[32], 48: made[48] });
+writeFileSync(join(SITE, "favicon.ico"), icoBuf);
+console.log(`  favicon.ico    ${icoBuf.length} bytes (16+32+48)`);

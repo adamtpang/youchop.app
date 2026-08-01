@@ -1,11 +1,11 @@
-# NORTH_STAR — youchop.app
+# NORTH_STAR, youchop.app
 
 Updated 2026-07-28 (upgrade session).
 
 ## North star
 
 **Paying Creator Channels (PCC):** channels that bought the $99 back-catalog pack or hold the $12/mo continuity sub.  
-Tagline: Real chapters for every YouTube video — description-ready for creators, native player UI for viewers (extension).
+Tagline: Real chapters for every YouTube video, description-ready for creators, native player UI for viewers (extension).
 
 Live: https://youchop.app · Free one-video: https://youchop.app/chop · Pack: https://youchop.app/creators
 
@@ -21,7 +21,7 @@ Ship one falsifiable proof that a real buyer got value:
 ## Buyer
 
 Primary: YouTube creators (and editors/agencies for 5–20 channels) in tutorial / education / podcast / interview niches, ~10k–500k subs, 100+ unchaptered videos.  
-Secondary: Adam himself (essay videos after upload) — dogfood the same path sold to creators.
+Secondary: Adam himself (essay videos after upload), dogfood the same path sold to creators.
 
 ## Painful problem
 
@@ -39,7 +39,7 @@ YouChop turns a video's transcript into ready-to-paste, search-phrased descripti
 
 ## Binding constraint (one only)
 
-**Evidence / activation** — the self-serve path now exists; the constraint is getting first external First Chapterize and first pack sale logged, not more product surface.
+**Evidence / activation**: the self-serve path now exists; the constraint is getting first external First Chapterize and first pack sale logged, not more product surface.
 
 ## Ownership
 

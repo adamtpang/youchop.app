@@ -1,4 +1,4 @@
-# EVIDENCE — youchop.app
+# EVIDENCE, youchop.app
 
 Updated 2026-07-28 (upgrade session: self-serve chapterize).
 
@@ -31,7 +31,7 @@ Updated 2026-07-28 (upgrade session: self-serve chapterize).
 
 | Field | Value |
 | --- | --- |
-| Buyer | (none yet — free self-serve ships first) |
+| Buyer | (none yet, free self-serve ships first) |
 | Problem | Unchaptered long-form / back-catalog invisible to Key Moments |
 | Cure | Transcript → paste-ready topic chapters |
 | Price paid | $0 free path; $99 pack |
@@ -44,10 +44,10 @@ Updated 2026-07-28 (upgrade session: self-serve chapterize).
 | --- | --- | --- | --- | --- |
 | 2026-07-26 | Fleet bootstrap created this baseline | n/a | file exists | this file |
 | 2026-07-28 | Live transcript probe | unknown | `POST /api/transcripts` 200 via **supadata** on `jNQXAC9IVRw` (Me at the zoo) | https://youchop.app/api/transcripts |
-| 2026-07-28 | Channel search probe | unknown | **BLOCKED** `no_data_key` — `YT_DATA_API_KEY` not set on Vercel | https://youchop.app/api/channel-search?q=veritasium |
+| 2026-07-28 | Channel search probe | unknown | **BLOCKED** `no_data_key`, `YT_DATA_API_KEY` not set on Vercel | https://youchop.app/api/channel-search?q=veritasium |
 | 2026-07-28 | Shipped creator self-serve `/chop` + `/api/chapterize` | no chapter gen path | **live** on youchop.app | https://youchop.app/chop |
-| 2026-07-28 | Prod E2E: `aircAruvnKk` (3Blue1Brown neural nets) | n/a | **PASS** — 8 chapters, `engine=heuristic`, `transcriptProvider=supadata`, paste starts `0:00` | `POST https://youchop.app/api/chapterize` |
-| 2026-07-28 | Anthropic titles | hoped live | **BLOCKED** — Vercel `ANTHROPIC_API_KEY` returns 401 "API key is invalid"; auto falls back to heuristic | set a valid key in Vercel env |
+| 2026-07-28 | Prod E2E: `aircAruvnKk` (3Blue1Brown neural nets) | n/a | **PASS**: 8 chapters, `engine=heuristic`, `transcriptProvider=supadata`, paste starts `0:00` | `POST https://youchop.app/api/chapterize` |
+| 2026-07-28 | Anthropic titles | hoped live | **BLOCKED**: Vercel `ANTHROPIC_API_KEY` returns 401 "API key is invalid"; auto falls back to heuristic | set a valid key in Vercel env |
 | 2026-07-28 | Activation metric defined | TBD | **First Chapterize** = successful chapterize (≥1 chapter + paste block) | this file + NORTH_STAR.md |
 
 ## Live vs stub (cold-start audit)

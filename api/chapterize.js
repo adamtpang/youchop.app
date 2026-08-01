@@ -3,9 +3,9 @@
 // Used for Adam's own essays after upload, and sold as the free sample / pack unit of work for creators.
 //
 // Engines:
-//   anthropic  — ANTHROPIC_API_KEY (already on the Vercel project from the old app). Cheap Haiku.
-//   heuristic  — free, no key: segment timed transcript by gaps + first-phrase titles.
-//   auto       — anthropic if key present, else heuristic.
+//   anthropic, ANTHROPIC_API_KEY (already on the Vercel project from the old app). Cheap Haiku.
+//   heuristic, free, no key: segment timed transcript by gaps + first-phrase titles.
+//   auto, anthropic if key present, else heuristic.
 //
 // Output is YouTube description-ready (must start at 0:00). Never posts to YouTube.
 
@@ -288,7 +288,7 @@ module.exports = async (req, res) => {
 
     if (!chapters && tryHeuristic) {
       if (!segs.length) {
-        // Plain text only — single chapter from title
+        // Plain text only, single chapter from title
         chapters = [{ start: 0, title: cleanTitle(t.title || "Full video") }];
         engine = "heuristic";
         engineMeta.note = "no_timestamps_in_transcript";
@@ -315,7 +315,7 @@ module.exports = async (req, res) => {
       title: c.title,
     })),
     paste,
-    // URL-free watermark (see GROWTH.md) — creator can strip before pasting
+    // URL-free watermark (see GROWTH.md), creator can strip before pasting
     pasteWithCredit: paste + "\n\n⏱ Chapters by YouChop",
     transcriptProvider: tx.provider,
     engine,

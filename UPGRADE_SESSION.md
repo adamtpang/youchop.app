@@ -1,4 +1,4 @@
-# UPGRADE_SESSION — youchop.app
+# UPGRADE_SESSION, youchop.app
 
 **Date:** 2026-07-28  
 **Mission:** Harden path that chapterizes Adam's own essay videos (and sells same to creators) after mp4 hits YouTube.  
@@ -10,13 +10,13 @@
 
 | Layer | Reality | Live vs stub |
 | --- | --- | --- |
-| **Chrome extension** | Source lost with deleted GitHub repo; never CWS-published | **Missing** — not rebuilt (in scope: do not rebuild framework) |
+| **Chrome extension** | Source lost with deleted GitHub repo; never CWS-published | **Missing**: not rebuilt (in scope: do not rebuild framework) |
 | **Player render** (seekbar segments + chapter list) | Only CSS/JS demo on `index.html` | **Stub / demo** |
 | **Landing** `index.html` | Static, deployed | **Live** |
 | **Creators** `creators.html` | $99 pack + mailto fulfillment; Stripe URL empty | **Live** (manual fulfillment) |
 | **Extract** `extract.html` | Channel → transcript tool | **Live UI**; channel search **blocked** without `YT_DATA_API_KEY` |
 | **API transcripts** | Supadata / Apify / ytio chain | **Live** via **supadata** (verified) |
-| **API channel-search / channel-videos** | YouTube Data API v3 | **Blocked** — `no_data_key` on prod |
+| **API channel-search / channel-videos** | YouTube Data API v3 | **Blocked**: `no_data_key` on prod |
 | **Chapter generation** | Did not exist before this session | **Shipped** → `/api/chapterize` + `/chop` |
 | **STRATEGY / GROWTH / ECONOMICS** | Present, B-first creator model | Authoritative; north star = PCC |
 
@@ -56,7 +56,7 @@ YouTube video (captions ready after upload)
         ▼
  /chop UI → user copies → paste into YouTube description
         │
-        ✗  extension player render (source lost — out of scope)
+        ✗  extension player render (source lost, out of scope)
 ```
 
 **Creator value does not need the extension.** Key Moments SEO requires description paste, not seekbar chrome. Viewer extension remains distribution/demo only (STRATEGY.md).
@@ -82,7 +82,7 @@ YouTube video (captions ready after upload)
 
 Filled in `OFFER.md`:
 
-> For **YouTube creators (and their editors)** who struggle with **back-catalogs and new uploads that have no searchable chapters**, **YouChop** is a **chapterization service** that **turns a video's transcript into ready-to-paste, topic-based description chapters** (and bulk-does up to 200 videos for $99). Unlike **monthly per-video tools ($19–39/mo) and generic YouTube auto-labels**, we **deliver editable Key Moments text you own forever — start free on one video at [/chop](https://youchop.app/chop)**.
+> For **YouTube creators (and their editors)** who struggle with **back-catalogs and new uploads that have no searchable chapters**, **YouChop** is a **chapterization service** that **turns a video's transcript into ready-to-paste, topic-based description chapters** (and bulk-does up to 200 videos for $99). Unlike **monthly per-video tools ($19–39/mo) and generic YouTube auto-labels**, we **deliver editable Key Moments text you own forever, start free on one video at [/chop](https://youchop.app/chop)**.
 
 ### (c) Activation metric documented
 
@@ -107,20 +107,20 @@ See `EVIDENCE.md`, `NORTH_STAR.md`, `vitals/vitals.data.js` (`activation` metric
 
 ## 5. Proof
 
-### PASS — one video chapterized E2E (production)
+### PASS, one video chapterized E2E (production)
 
 | Field | Value |
 | --- | --- |
 | When | 2026-07-28 |
 | Endpoint | `POST https://youchop.app/api/chapterize` |
-| Video | `aircAruvnKk` — *But what is a neural network? \| Deep learning chapter 1* (3Blue1Brown) |
+| Video | `aircAruvnKk`, *But what is a neural network? \| Deep learning chapter 1* (3Blue1Brown) |
 | HTTP | **200** |
 | Transcript | `supadata` |
 | Engine | `heuristic` (Anthropic auto-fallback after 401) |
 | Chapters | **8** |
 | Paste starts at | `0:00` (YouTube description requirement) |
 
-Example paste (heuristic quality — usable structure, titles not yet LLM-grade):
+Example paste (heuristic quality, usable structure, titles not yet LLM-grade):
 
 ```
 0:00 This is a 3
@@ -143,7 +143,7 @@ Mock path also **200** with demo chapters.
 | --- | --- | --- |
 | **`ANTHROPIC_API_KEY` invalid (401)** on Vercel | Titles stay heuristic (mid-sentence fragments) | Replace with a valid Anthropic key in Vercel project env (Production + Preview). Optional: `CHAPTERIZE_MODEL=claude-3-5-haiku-latest` |
 | **`YT_DATA_API_KEY` missing** | `/extract` channel search/list fails; paste-IDs still works | Add free YouTube Data API v3 key to Vercel |
-| **Extension source lost** | No native seekbar for viewers | Restore deleted GitHub repo or rebuild later — **not required for creator $99 path** |
+| **Extension source lost** | No native seekbar for viewers | Restore deleted GitHub repo or rebuild later, **not required for creator $99 path** |
 | **Stripe pack URL empty** | Pack CTA is mailto | Create Payment Link → set `STRIPE_PACK_URL` in `creators.html` |
 
 ---
@@ -152,9 +152,9 @@ Mock path also **200** with demo chapters.
 
 | File | Change |
 | --- | --- |
-| `api/chapterize.js` | **New** — chapterize pipeline |
+| `api/chapterize.js` | **New**: chapterize pipeline |
 | `api/transcripts.js` | Export `fetchTranscripts`, `parseVideoId`, `hms` |
-| `chop.html` | **New** — self-serve UI |
+| `chop.html` | **New**: self-serve UI |
 | `creators.html` | Free sample → `/chop` |
 | `index.html` | Nav + web chapterize hint |
 | `OFFER.md` | One-liner filled |

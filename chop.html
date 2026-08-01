@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>YouChop — Chapterize one YouTube video (free self-serve)</title>
-<meta name="description" content="Paste a YouTube link. Get ready-to-paste description chapters in seconds — topic titles from the transcript, starting at 0:00 for Google Key Moments." />
+<title>YouChop, Chapterize one YouTube video (free self-serve)</title>
+<meta name="description" content="Paste a YouTube link. Get ready-to-paste description chapters in seconds, topic titles from the transcript, starting at 0:00 for Google Key Moments." />
 <meta name="keywords" content="youtube chapter generator, auto generate youtube chapters, free youtube timestamps, paste youtube chapters description" />
 <link rel="canonical" href="https://youchop.app/chop" />
-<meta property="og:title" content="YouChop — chapterize one video, free" />
+<meta property="og:title" content="YouChop, chapterize one video, free" />
 <meta property="og:description" content="Paste a YouTube URL. Copy description-ready chapters. Same path we use for creator packs." />
 <meta property="og:url" content="https://youchop.app/chop" />
 <meta property="og:type" content="website" />
@@ -16,6 +16,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <style>
   .chop-meta { margin-top: 18px; font-family: var(--mono); font-size: 12.5px; color: var(--mut); display: none; }
@@ -59,15 +61,15 @@
       Paste a link. Get <span class="amber">chapters</span>.
     </h1>
     <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:58ch; line-height:1.6">
-      Ready-to-paste description text — starts at <strong style="color:var(--ink)">0:00</strong> so Google can index
+      Ready-to-paste description text, starts at <strong style="color:var(--ink)">0:00</strong> so Google can index
       <strong style="color:var(--ink)">Key Moments</strong>. Same unit of work as the $99 back-catalog pack; this page does one video free.
     </p>
 
     <div class="input-row" style="margin-top:28px">
-      <input class="tool-input" id="url-input" placeholder="https://youtube.com/watch?v=…   —   after your mp4 is on YouTube" autocomplete="off" />
+      <input class="tool-input" id="url-input" placeholder="https://youtube.com/watch?v=…, after your mp4 is on YouTube" autocomplete="off" />
       <button class="btn btn-amber" id="chop-btn">Chapterize</button>
     </div>
-    <p class="input-hint">Needs captions (YouTube auto-captions count). We never post to your channel — you paste.</p>
+    <p class="input-hint">Needs captions (YouTube auto-captions count). We never post to your channel, you paste.</p>
     <div class="err-box" id="err"></div>
   </header>
 
@@ -87,7 +89,7 @@
     <textarea class="paste-box" id="paste-box" readonly spellcheck="false"></textarea>
     <div class="hint-row">
       <span class="engine-pill">Paste into YouTube Studio → Details → Description</span>
-      <span class="engine-pill">Edit any title first — it's yours</span>
+      <span class="engine-pill">Edit any title first; it's yours</span>
     </div>
     <p class="input-hint" style="margin-top:18px">
       Whole channel? <a href="/creators" style="color:var(--amber)">$99 for up to 200 videos</a>
@@ -107,7 +109,7 @@
       <div class="step reveal">
         <div class="num">2</div>
         <h3>Chapterize</h3>
-        <p>We pull the timed transcript and write topic titles — not “Introduction / Main Discussion”.</p>
+        <p>We pull the timed transcript and write topic titles, not “Introduction / Main Discussion”.</p>
       </div>
       <div class="step reveal">
         <div class="num">3</div>
