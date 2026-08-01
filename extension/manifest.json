@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Grab any YouTube video's transcript in one click. Clean text for Claude, ChatGPT or Cursor. Runs locally: no account, no API key, nothing leaves your machine.",
   "permissions": ["clipboardWrite", "downloads", "activeTab", "scripting"],
-  "host_permissions": ["https://www.youtube.com/*"],
+  "host_permissions": ["https://www.youtube.com/*", "https://youchop.app/*"],
   "action": {
     "default_title": "YouChop",
     "default_popup": "popup.html"

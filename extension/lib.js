@@ -141,13 +141,44 @@ const YC = {
      where the button lives. */
   async openPanel() {
     if (YC.fromPanel()) return true;
-    const expand = document.querySelector("#description-inline-expander #expand, tp-yt-paper-button#expand, #expand");
-    if (expand) { expand.click(); await YC.sleep(500); }
-    const btn = [...document.querySelectorAll("button, tp-yt-paper-button, yt-button-shape button")]
-      .find((b) => /show transcript|transcript/i.test((b.textContent || "") + " " + (b.getAttribute("aria-label") || "")));
+
+    // The button lives inside the (collapsed) description, so expand that first.
+    for (const sel of ["#description-inline-expander #expand", "tp-yt-paper-button#expand",
+                       "#expand", "#description #expand"]) {
+      const e = document.querySelector(sel);
+      if (e) { e.click(); await YC.sleep(600); break; }
+    }
+
+    // Look in the transcript section first, then fall back to a targeted scan.
+    // The match must be tight: a loose /transcript/i hits unrelated links and
+    // clicking the wrong element silently does nothing.
+    const exact = (el) => {
+      const t = (el.textContent || "").trim().toLowerCase();
+      const a = (el.getAttribute("aria-label") || "").trim().toLowerCase();
+      return t === "show transcript" || a === "show transcript" ||
+             t.startsWith("show transcript") || a.startsWith("show transcript");
+    };
+    const findBtn = () => {
+      const section = document.querySelector("ytd-video-description-transcript-section-renderer");
+      const scope = section ? [section] : [document];
+      for (const root of scope) {
+        const btns = [...root.querySelectorAll("button, tp-yt-paper-button, yt-button-shape button, a")];
+        const hit = btns.find(exact);
+        if (hit) return hit;
+      }
+      // last resort: the section's own single button
+      return document.querySelector("ytd-video-description-transcript-section-renderer button");
+    };
+
+    let btn = findBtn();
+    if (!btn) {                      // description may still be rendering
+      await YC.sleep(900);
+      btn = findBtn();
+    }
     if (!btn) return false;
+
     btn.click();
-    for (let i = 0; i < 20; i++) { await YC.sleep(300); if (YC.fromPanel()) return true; }
+    for (let i = 0; i < 25; i++) { await YC.sleep(320); if (YC.fromPanel()) return true; }
     return !!YC.fromPanel();
   },
 
@@ -249,10 +280,22 @@ const YC = {
     }
 
     if (!segs) {
-      const api = await YC.fromApi(videoId, lang);
-      segs = api.rows; source = "youchop.app";
-      if (api.title) meta.title = api.title;
-      if (api.author) meta.author = api.author;
+      if (onProgress) onProgress(0.6, 0, null, "asking youchop.app");
+      try {
+        const api = await YC.fromApi(videoId, lang);
+        segs = api.rows; source = "youchop.app";
+        if (api.title) meta.title = api.title;
+        if (api.author) meta.author = api.author;
+      } catch (e) {
+        // The local paths are the ones that normally work, so if we got here the
+        // panel could not be opened. Say that, rather than surfacing a network error.
+        const net = /failed to fetch|networkerror|load failed/i.test(String(e.message || e));
+        throw new Error(
+          net
+            ? "Could not open the transcript panel automatically. Click “Show transcript” under the video, then click Chop again."
+            : String(e.message || e)
+        );
+      }
     }
 
     if (!segs?.length) throw new Error("no transcript available for this video");
