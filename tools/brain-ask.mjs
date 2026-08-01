@@ -82,46 +82,78 @@ export function signature(pagesDir) {
   return `${files.length}:${bytes}`;
 }
 
-export async function buildIndex(pagesDir, cacheFile, log = () => {}) {
+/* The index is two files on purpose:
+     index.json   metadata + chunk text (small, human-inspectable)
+     vectors.bin  raw float32 vectors, count x dims, contiguous
+   Storing vectors as binary rather than JSON decimals cuts the index roughly 3x
+   and makes scoring faster, because we can dot-product straight out of one
+   Float32Array by offset instead of allocating an array per chunk. */
+export const INDEX_JSON = "index.json";
+export const INDEX_BIN = "vectors.bin";
+
+export async function buildIndex(pagesDir, outDir, log = () => {}) {
   const chunks = loadChunks(pagesDir);
   const extract = await embedder();
-  const vecs = [];
-  const B = 32;
   const t0 = Date.now();
+  let dims = 0;
+  const parts = [];
+  const B = 32;
   for (let i = 0; i < chunks.length; i += B) {
     const out = await extract(chunks.slice(i, i + B).map((c) => c.text), { pooling: "mean", normalize: true });
-    const d = out.dims[1];
-    for (let r = 0; r < Math.min(B, chunks.length - i); r++) vecs.push(Array.from(out.data.slice(r * d, (r + 1) * d)));
+    dims = out.dims[1];
+    const n = Math.min(B, chunks.length - i);
+    parts.push(Float32Array.from(out.data.slice(0, n * dims)));
     log(Math.round(100 * Math.min(i + B, chunks.length) / chunks.length), chunks.length);
   }
-  const secs = Math.round((Date.now() - t0) / 1000);
-  writeFileSync(cacheFile, JSON.stringify({ model: MODEL, sig: signature(pagesDir), chunks, vecs }), "utf8");
-  return { chunks, vecs, secs };
+  const vecs = new Float32Array(chunks.length * dims);
+  let off = 0;
+  for (const p of parts) { vecs.set(p, off); off += p.length; }
+
+  writeFileSync(join(outDir, INDEX_JSON),
+    JSON.stringify({ model: MODEL, sig: signature(pagesDir), dims, count: chunks.length, chunks }), "utf8");
+  writeFileSync(join(outDir, INDEX_BIN), Buffer.from(vecs.buffer, vecs.byteOffset, vecs.byteLength));
+  return { chunks, vecs, dims, secs: Math.round((Date.now() - t0) / 1000) };
+}
+
+export function loadIndex(dir) {
+  const meta = JSON.parse(readFileSync(join(dir, INDEX_JSON), "utf8"));
+  const buf = readFileSync(join(dir, INDEX_BIN));
+  const vecs = new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
+  if (vecs.length !== meta.count * meta.dims) throw new Error("index and vectors disagree; run with --rebuild");
+  return { ...meta, vecs };
+}
+
+// dot product against row i of the packed vector array (both sides are unit vectors)
+export function dotAt(q, vecs, i, dims) {
+  let s = 0;
+  const o = i * dims;
+  for (let k = 0; k < dims; k++) s += q[k] * vecs[o + k];
+  return s;
 }
 
 /* ---------------- CLI ---------------- */
 async function main() {
   const HERE = dirname(fileURLToPath(import.meta.url));
   const PAGES = join(HERE, "pages");
-  const CACHE = join(HERE, "embeddings.json");
   const argv = process.argv.slice(2);
   const flag = (f) => argv.includes(f);
   const val = (f, d) => { const i = argv.indexOf(f); return i > -1 && argv[i + 1] ? argv[i + 1] : d; };
   const question = argv.filter((a, i) => !a.startsWith("--") && argv[i - 1] !== "--top").join(" ").trim();
 
   let store = null;
-  if (!flag("--rebuild") && existsSync(CACHE)) {
+  const haveIndex = existsSync(join(HERE, INDEX_JSON)) && existsSync(join(HERE, INDEX_BIN));
+  if (!flag("--rebuild") && haveIndex) {
     try {
-      store = JSON.parse(readFileSync(CACHE, "utf8"));
+      store = loadIndex(HERE);
       if (store.sig && store.sig !== signature(PAGES)) {
         console.log("pages changed since the index was built; re-embedding...");
         store = null;
       }
-    } catch { store = null; }
+    } catch (e) { console.log(`rebuilding index (${e.message})`); store = null; }
   }
   if (!store) {
     console.log("building the index (one-time; downloads a ~35MB model)...");
-    store = await buildIndex(PAGES, CACHE, (pct) => process.stdout.write(`  ${pct}%\r`));
+    store = await buildIndex(PAGES, HERE, (pct) => process.stdout.write(`  ${pct}%\r`));
     console.log(`\nindexed in ${store.secs}s, cost $0.00`);
   }
 
@@ -132,11 +164,10 @@ async function main() {
 
   const extract = await embedder();
   const qout = await extract([QPREFIX + question], { pooling: "mean", normalize: true });
-  const qv = Array.from(qout.data.slice(0, qout.dims[1]));
-  const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+  const qv = Float32Array.from(qout.data.slice(0, qout.dims[1]));
 
   const scored = store.chunks
-    .map((c, i) => ({ ...c, score: dot(qv, store.vecs[i]) }))
+    .map((c, i) => ({ ...c, score: dotAt(qv, store.vecs, i, store.dims) }))
     .sort((a, b) => b.score - a.score);
 
   let hits = scored;

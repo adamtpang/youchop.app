@@ -277,10 +277,16 @@ async function processChannel(channel, idx) {
       try {
         const ask = await import(pathToFileURL(join(TOOLS_DIR, "brain-ask.mjs")).href);
         process.stdout.write(`  ▸ pre-building the search index (local, free) ... `);
-        const r = await ask.buildIndex(PAGES, join(BR, "embeddings.json"),
+        const r = await ask.buildIndex(PAGES, BR,
           (pct) => process.stdout.write(`\r  ▸ pre-building the search index (local, free) ... ${pct}%   `));
-        const mb = (readFileSync(join(BR, "embeddings.json")).length / 1048576).toFixed(1);
-        console.log(`\r  ▸ pre-built index: ${r.chunks.length} chunks in ${r.secs}s, ${mb}MB · buyer's first query is instant`);
+        const mb = (p) => readFileSync(join(BR, p)).length / 1048576;
+        const total = (mb(ask.INDEX_JSON) + mb(ask.INDEX_BIN)).toFixed(1);
+        // drop index files from older formats so an export never ships two of them
+        for (const legacy of ["embeddings.json"]) {
+          const p = join(BR, legacy);
+          if (existsSync(p)) { try { unlinkSync(p); console.log(`\r  ▸ removed legacy ${legacy}`); } catch {} }
+        }
+        console.log(`\r  ▸ pre-built index: ${r.chunks.length} chunks in ${r.secs}s, ${total}MB (${mb(ask.INDEX_JSON).toFixed(1)}MB text + ${mb(ask.INDEX_BIN).toFixed(1)}MB float32) · first query is instant`);
       } catch (e) {
         console.log(`\r  ⚠ skipped index pre-build (${String(e.message || e).slice(0, 60)}). ask.mjs will build it on first run.`);
       }
@@ -317,10 +323,12 @@ the moment in the video.
 
 ## What is in here
 
-    pages/       one markdown file per episode, with frontmatter and a source link.
-                 Paragraphs are headed by timestamped deep links, so any passage you
-                 find points back to the exact second it came from.
-    ask.mjs      the local search tool above.
+    pages/          one markdown file per episode, with frontmatter and a source link.
+                    Paragraphs are headed by timestamped deep links, so any passage
+                    you find points back to the exact second it came from.
+    ask.mjs         the local search tool above.
+    index.json      chunk text and metadata for the pre-built search index.
+    vectors.bin     the embeddings, raw float32. Regenerate both with --rebuild.
 
 The pages are plain markdown. Nothing is locked in: drop them into Obsidian, grep them,
 paste them into any LLM, or index them with another tool.
