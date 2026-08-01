@@ -110,10 +110,19 @@
         toast("Downloaded.");
       };
     } catch (err) {
-      out.value = "";
+      // put the full diagnostic in the textarea so it can be read and copied,
+      // rather than truncating it into the one-line footer
       $("#yc-prog", el).style.display = "none";
-      $("#yc-foot", el).textContent = String(err.message || err);
+      out.value = String(err.message || err);
       $("#yc-meta", el).textContent = "could not extract";
+      $("#yc-foot", el).textContent = "Select the text above and copy it to report this.";
+      $("#yc-controls", el).style.display = "flex";
+      $("#yc-fmt", el).style.visibility = "hidden";
+      $("#yc-copy", el).onclick = async () => {
+        try { await navigator.clipboard.writeText(out.value); toast("Diagnostics copied."); }
+        catch { out.select(); }
+      };
+      $("#yc-download", el).style.display = "none";
     }
   }
 

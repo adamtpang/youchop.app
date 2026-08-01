@@ -121,19 +121,79 @@ const YC = {
     return v && isFinite(v.duration) && v.duration > 0 ? Math.floor(v.duration) : 0;
   },
 
-  /* Read whatever transcript rows are currently rendered in YouTube's panel. */
+  toSec(stamp) {
+    const p = String(stamp).trim().split(":").map(Number);
+    if (p.some(isNaN)) return null;
+    return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2]
+         : p.length === 2 ? p[0] * 60 + p[1] : null;
+  },
+
+  /* Read whatever transcript rows are rendered in YouTube's panel.
+     YouTube's markup for this panel has changed before, so rather than trust one
+     selector we try three strategies, ending with a structural one that only
+     assumes "a row begins with a timestamp". YC.lastPanelStrategy records which
+     worked, so a failure can report why instead of guessing. */
+  lastPanelStrategy: null,
+
   fromPanel() {
-    const rows = [...document.querySelectorAll("ytd-transcript-segment-renderer")]
-      .map((s) => {
-        const t = (s.querySelector(".segment-timestamp")?.textContent || "").trim();
-        const text = (s.querySelector(".segment-text")?.textContent || "").trim();
-        const parts = t.split(":").map(Number);
-        const sec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2]
-                  : parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
-        return { t: sec, text };
-      })
-      .filter((r) => r.text);
-    return rows.length ? rows : null;
+    const mk = (stamp, text) => {
+      const sec = YC.toSec(stamp);
+      return sec === null || !text ? null : { t: sec, text: text.trim() };
+    };
+
+    // 1. the documented custom element
+    let rows = [...document.querySelectorAll("ytd-transcript-segment-renderer")]
+      .map((s) => mk(s.querySelector(".segment-timestamp")?.textContent || "",
+                     s.querySelector(".segment-text")?.textContent || ""))
+      .filter(Boolean);
+    if (rows.length) { YC.lastPanelStrategy = "ytd-transcript-segment-renderer"; return rows; }
+
+    // 2. class-name variants, in case the element was renamed
+    rows = [...document.querySelectorAll('[class*="transcript-segment"], [class*="segment-renderer"]')]
+      .map((s) => mk(s.querySelector('[class*="timestamp"]')?.textContent || "",
+                     s.querySelector('[class*="segment-text"], [class*="text"]')?.textContent || ""))
+      .filter(Boolean);
+    if (rows.length) { YC.lastPanelStrategy = "class-variant"; return rows; }
+
+    // 3. structural: inside the transcript panel, any leaf row whose text starts
+    //    with a timestamp. Survives renames because it assumes almost nothing.
+    const panel =
+      document.querySelector("ytd-transcript-renderer") ||
+      document.querySelector("ytd-engagement-panel-section-list-renderer[target-id*='transcript']") ||
+      document.querySelector("[target-id*='searchable-transcript']");
+    if (panel) {
+      const seen = new Set();
+      rows = [];
+      for (const el of panel.querySelectorAll("div, li, button, span, yt-formatted-string")) {
+        const txt = (el.textContent || "").trim();
+        const m = txt.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(\S[\s\S]{0,600})$/);
+        if (!m) continue;
+        // keep the tightest element for each timestamp (skip wrapping containers)
+        if (seen.has(m[1]) ) continue;
+        if (el.querySelector("div, li, button")) continue;
+        seen.add(m[1]);
+        const r = mk(m[1], m[2].replace(/\s+/g, " "));
+        if (r) rows.push(r);
+      }
+      if (rows.length) { YC.lastPanelStrategy = "structural"; return rows; }
+    }
+
+    YC.lastPanelStrategy = null;
+    return null;
+  },
+
+  /* What the page looks like right now, for honest error reporting. */
+  panelDiagnostics() {
+    const q = (s) => document.querySelectorAll(s).length;
+    const panel = document.querySelector("ytd-transcript-renderer, ytd-engagement-panel-section-list-renderer[target-id*='transcript']");
+    return {
+      segmentEls: q("ytd-transcript-segment-renderer"),
+      classVariants: q('[class*="transcript-segment"], [class*="segment-renderer"]'),
+      panelPresent: !!panel,
+      panelVisibility: panel?.getAttribute?.("visibility") || "n/a",
+      strategy: YC.lastPanelStrategy || "none matched",
+      duration: YC.videoDuration(),
+    };
   },
 
   /* Open YouTube's transcript panel if it is not already showing, so the user
@@ -272,11 +332,13 @@ const YC = {
         const pr = await YC.playerResponse(videoId);
         meta = YC.meta(pr);
         const track = YC.pickTrack(pr, lang);
-        if (track) {
+        if (!track) { YC.lastCaptionNote = "video has no caption tracks"; }
+        else {
           const s = await YC.fetchTrack(track);
-          if (s.length) { segs = s; source = "captions"; }
+          if (s.length) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; }
+          else YC.lastCaptionNote = "endpoint returned empty (PoToken bot-gate)";
         }
-      } catch { /* fall through to the API */ }
+      } catch (e) { YC.lastCaptionNote = String(e.message || e).slice(0, 60); }
     }
 
     if (!segs) {
@@ -287,14 +349,20 @@ const YC = {
         if (api.title) meta.title = api.title;
         if (api.author) meta.author = api.author;
       } catch (e) {
-        // The local paths are the ones that normally work, so if we got here the
-        // panel could not be opened. Say that, rather than surfacing a network error.
+        // Every path failed. Report what each one actually saw instead of guessing
+        // at a cause, so the failure is diagnosable rather than mysterious.
+        const d = YC.panelDiagnostics();
         const net = /failed to fetch|networkerror|load failed/i.test(String(e.message || e));
-        throw new Error(
-          net
-            ? "Could not open the transcript panel automatically. Click “Show transcript” under the video, then click Chop again."
-            : String(e.message || e)
+        const err = new Error(
+          "Could not read the transcript.\n" +
+          `panel: ${d.panelPresent ? "present" : "not found"} (${d.panelVisibility}), ` +
+          `${d.segmentEls} segment elements, ${d.classVariants} class variants, strategy: ${d.strategy}\n` +
+          `captions: ${YC.lastCaptionNote || "not reached"}\n` +
+          `youchop.app: ${net ? "blocked (reload the extension to pick up host permissions)" : String(e.message || e)}\n` +
+          "If the transcript panel is open and this still fails, the panel markup changed; send this text."
         );
+        err.diagnostics = d;
+        throw err;
       }
     }
 
