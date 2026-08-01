@@ -28,7 +28,11 @@
         <span class="yc-meta" id="yc-meta"></span>
         <button class="yc-x" id="yc-close" title="Close">&times;</button>
       </div>
-      <div class="yc-bar">
+      <div class="yc-prog" id="yc-prog">
+        <div class="yc-prog-track"><div class="yc-prog-fill" id="yc-prog-fill"></div></div>
+        <div class="yc-prog-label" id="yc-prog-label">Starting...</div>
+      </div>
+      <div class="yc-bar" id="yc-controls" style="display:none">
         <div class="yc-seg" id="yc-fmt">
           <button data-f="clean" class="on">Clean text</button>
           <button data-f="timestamps">Timestamps</button>
@@ -57,15 +61,30 @@
     if (!id) return;
     const el = panel();
     const out = $("#yc-out", el);
-    out.value = "Reading captions from this video...";
+    out.value = "";
     let state = { segs: null, meta: null, format: "clean" };
 
+    const fill = $("#yc-prog-fill", el);
+    const plabel = $("#yc-prog-label", el);
+    const onProgress = (frac, count, eta, stage) => {
+      fill.style.width = Math.round(Math.max(0.02, frac) * 100) + "%";
+      const pct = Math.round(frac * 100);
+      const etaTxt = eta == null ? "" : eta > 0 ? ` · about ${eta}s left` : " · almost done";
+      plabel.textContent = `${stage}... ${pct}%${count ? ` · ${count.toLocaleString()} lines` : ""}${etaTxt}`;
+    };
+
     try {
-      const res = await YC.extract(id, "clean");
+      const res = await YC.extract(id, "clean", "en", onProgress);
       state.segs = res.segs; state.meta = res.meta;
+      // swap the progress bar for the controls
+      $("#yc-prog", el).style.display = "none";
+      $("#yc-controls", el).style.display = "flex";
       const words = res.text.trim().split(/\s+/).length;
+      const via = res.source === "panel" ? "local, free"
+                : res.source === "captions" ? "captions"
+                : "via youchop.app";
       $("#yc-meta", el).textContent =
-        `${res.meta.title.slice(0, 54)} · ${words.toLocaleString()} words · ~${Math.round(res.text.length / 4).toLocaleString()} tokens · ${res.language}`;
+        `${res.meta.title.slice(0, 46)} · ${words.toLocaleString()} words · ~${Math.round(res.text.length / 4).toLocaleString()} tokens · ${via}`;
       out.value = res.text;
 
       const rerender = () => { out.value = YC.render(state.segs, state.meta, state.format); };
@@ -92,6 +111,7 @@
       };
     } catch (err) {
       out.value = "";
+      $("#yc-prog", el).style.display = "none";
       $("#yc-foot", el).textContent = String(err.message || err);
       $("#yc-meta", el).textContent = "could not extract";
     }

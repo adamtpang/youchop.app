@@ -51,6 +51,20 @@ button.youchop-inject:hover { filter: brightness(1.1); }
 }
 #youchop-panel .yc-x:hover { color: #f2efe9; }
 
+#youchop-panel .yc-prog { padding: 14px 14px 6px; }
+#youchop-panel .yc-prog-track {
+  height: 6px; background: #2a2a33; border-radius: 99px; overflow: hidden;
+}
+#youchop-panel .yc-prog-fill {
+  height: 100%; width: 2%; border-radius: 99px;
+  background: linear-gradient(90deg, #ffb43a, #ff4930);
+  transition: width .25s ease;
+}
+#youchop-panel .yc-prog-label {
+  margin-top: 8px; font-size: 11.5px; color: #8f8d96;
+  font-variant-numeric: tabular-nums;
+}
+
 #youchop-panel .yc-bar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; padding: 10px 14px; flex-wrap: wrap;

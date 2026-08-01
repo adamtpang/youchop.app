@@ -114,9 +114,14 @@ const YC = {
     return `# ${meta.title}\n${url}\n\n${text}\n`;
   },
 
-  /* Read the transcript out of YouTube's own transcript panel, if the user has it
-     open. This is the most robust local path because YouTube itself fetched the
-     data with all the right tokens; we only read the rendered DOM. */
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+
+  videoDuration() {
+    const v = document.querySelector("video");
+    return v && isFinite(v.duration) && v.duration > 0 ? Math.floor(v.duration) : 0;
+  },
+
+  /* Read whatever transcript rows are currently rendered in YouTube's panel. */
   fromPanel() {
     const rows = [...document.querySelectorAll("ytd-transcript-segment-renderer")]
       .map((s) => {
@@ -129,6 +134,59 @@ const YC = {
       })
       .filter((r) => r.text);
     return rows.length ? rows : null;
+  },
+
+  /* Open YouTube's transcript panel if it is not already showing, so the user
+     only has to click once. Needs the description expanded first, because that is
+     where the button lives. */
+  async openPanel() {
+    if (YC.fromPanel()) return true;
+    const expand = document.querySelector("#description-inline-expander #expand, tp-yt-paper-button#expand, #expand");
+    if (expand) { expand.click(); await YC.sleep(500); }
+    const btn = [...document.querySelectorAll("button, tp-yt-paper-button, yt-button-shape button")]
+      .find((b) => /show transcript|transcript/i.test((b.textContent || "") + " " + (b.getAttribute("aria-label") || "")));
+    if (!btn) return false;
+    btn.click();
+    for (let i = 0; i < 20; i++) { await YC.sleep(300); if (YC.fromPanel()) return true; }
+    return !!YC.fromPanel();
+  },
+
+  /* YouTube virtualises the transcript list: for a long video only the visible
+     rows exist in the DOM. So scroll the panel and accumulate rows until the last
+     timestamp we have seen reaches the video's duration (or nothing new arrives).
+     Progress is measured against the video's real duration, which makes the bar
+     and the ETA honest rather than decorative. */
+  async harvestPanel(onProgress) {
+    const duration = YC.videoDuration();
+    const seen = new Map();
+    const started = Date.now();
+    const absorb = () => { for (const r of YC.fromPanel() || []) if (!seen.has(r.t)) seen.set(r.t, r.text); };
+
+    const scroller =
+      document.querySelector("ytd-transcript-segment-list-renderer #segments-container")?.parentElement ||
+      document.querySelector("ytd-transcript-segment-list-renderer") ||
+      document.querySelector("ytd-engagement-panel-section-list-renderer[target-id*='transcript'] #content");
+
+    absorb();
+    let stalls = 0, lastCount = seen.size;
+    for (let i = 0; i < 400 && stalls < 6; i++) {
+      const maxT = seen.size ? Math.max(...seen.keys()) : 0;
+      if (duration && maxT >= duration - 12) break;      // reached the end
+      if (onProgress) {
+        const frac = duration ? Math.min(0.99, maxT / duration) : 0;
+        const elapsed = (Date.now() - started) / 1000;
+        const eta = frac > 0.04 ? Math.max(0, Math.round(elapsed / frac - elapsed)) : null;
+        onProgress(frac, seen.size, eta);
+      }
+      if (!scroller) break;
+      scroller.scrollTop = scroller.scrollHeight;         // pull in the next window
+      await YC.sleep(140);
+      absorb();
+      if (seen.size === lastCount) stalls++; else { stalls = 0; lastCount = seen.size; }
+    }
+    absorb();
+    if (onProgress) onProgress(1, seen.size, 0);
+    return [...seen.entries()].sort((a, b) => a[0] - b[0]).map(([t, text]) => ({ t, text }));
   },
 
   /* Ask youchop.app to fetch it. Used when the local paths are unavailable. */
@@ -155,14 +213,30 @@ const YC = {
   /* Tries, in order: YouTube's open transcript panel (free, local, most reliable),
      the caption endpoint directly (free, but YouTube now bot-gates it and often
      returns an empty body), then youchop.app as the fallback that always works. */
-  async extract(videoId, format = "clean", lang = "en") {
-    let meta = { videoId, title: document.title.replace(/ - YouTube$/, ""), author: "", duration: 0 };
+  async extract(videoId, format = "clean", lang = "en", onProgress = null) {
+    let meta = { videoId, title: document.title.replace(/ - YouTube$/, ""), author: "", duration: YC.videoDuration() };
     let segs = null, source = null;
 
-    const panel = YC.fromPanel();
-    if (panel) { segs = panel; source = "panel"; }
+    // Preferred path: YouTube's own transcript panel. Free, local, and it is the
+    // one path confirmed working, because YouTube fetched the data itself with
+    // valid tokens and we only read the rendered DOM.
+    if (onProgress) onProgress(0, 0, null, "opening transcript");
+    if (await YC.openPanel()) {
+      segs = await YC.harvestPanel(
+        onProgress ? (f, n, eta) => onProgress(f, n, eta, "reading transcript") : null
+      );
+      if (segs?.length) {
+        source = "panel";
+        // fill in author/title from the page, since we skipped the player response
+        const ch = document.querySelector("#owner #channel-name a, ytd-channel-name#channel-name a");
+        if (ch) meta.author = ch.textContent.trim();
+        const h1 = document.querySelector("h1.ytd-watch-metadata yt-formatted-string, h1 yt-formatted-string");
+        if (h1?.textContent.trim()) meta.title = h1.textContent.trim();
+      }
+    }
 
-    if (!segs) {
+    if (!segs?.length) {
+      if (onProgress) onProgress(0.3, 0, null, "reading captions");
       try {
         const pr = await YC.playerResponse(videoId);
         meta = YC.meta(pr);

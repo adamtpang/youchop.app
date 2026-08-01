@@ -10,38 +10,29 @@ deep links, plus copy and download.
 2. Turn on **Developer mode**
 3. **Load unpacked** and pick this folder
 
-## Status: extraction path is PARTIALLY VERIFIED. Read this before trusting it.
+## How it gets the transcript
 
-Tested against a live YouTube page in an automated browser on 2026-07-31.
+`lib.js` tries three sources in order:
 
-| Path | Result |
-|---|---|
-| Parse `ytInitialPlayerResponse` from the watch page (title, author, caption list) | **Works.** The brace-walking parser is correct. |
-| Fetch the caption `baseUrl` directly | **Blocked.** Returns HTTP 200 with an *empty body*, with `fmt=json3` and without. The URL carries no `pot` param, so YouTube's PoToken bot-check is serving nothing. |
-| Innertube `get_transcript` | **400.** The payload needs more `context` fields than we send. |
-| Read YouTube's own rendered transcript panel | **Unproven.** The button is findable and the panel exists in the DOM, but a programmatic `.click()` left it `ENGAGEMENT_PANEL_VISIBILITY_HIDDEN` and no segments rendered. |
+1. **YouTube's own transcript panel — CONFIRMED WORKING in real Chrome (2026-08-01).**
+   Free, local, nothing leaves the machine. The extension opens the panel itself, then reads
+   the rendered DOM. This is reliable precisely because YouTube fetched the data with its own
+   valid tokens; we only read what it drew.
+2. The caption endpoint directly. **Currently bot-gated:** `baseUrl` returns HTTP 200 with an
+   *empty body* (no `pot` param, so PoToken blocks it). Kept as a cheap second try in case
+   that changes.
+3. `youchop.app/api/transcripts`. Always works, but spends the server's provider quota, so it
+   is the last resort rather than the default.
 
-Important caveat: that testing ran in an **automated browser with no logged-in YouTube
-session**. A real user's Chrome has different cookies, a real fingerprint, and genuine user
-gestures, all of which plausibly change the PoToken and panel-click outcomes. So the local
-paths are *unconfirmed*, not *known broken*.
+In practice path 1 handles it, so **extraction is free per use**.
 
-Because of that uncertainty `lib.js` tries three sources in order, and the last one works today:
+### Long videos: the virtualised-list problem
 
-1. **YouTube's open transcript panel** (free, local, most reliable when the user has it open,
-   since YouTube fetched the data itself with valid tokens)
-2. **The caption endpoint directly** (free, currently bot-gated)
-3. **`youchop.app/api/transcripts`** (proven, this is what built the 1.28M-word corpora;
-   uses the server's provider quota)
-
-So the button returns a transcript today via path 3 even if 1 and 2 fail.
-
-## Next step to make it fully free
-
-Verify path 1 in a real Chrome profile: open a video, click **Show transcript** yourself, then
-click **Chop**. If `fromPanel()` returns rows, the extension is fully local and costs nothing
-per use, and the button can simply open the panel first. That single manual check is the
-cheapest way to settle it.
+YouTube only keeps the *visible* transcript rows in the DOM, so a naive read of a two-hour
+video returns a fraction of it. `harvestPanel()` scrolls the panel and accumulates rows,
+deduping by timestamp, until the last timestamp reaches the video's duration or nothing new
+arrives. Progress is measured as **last-loaded-timestamp / video-duration**, which is why the
+bar and the ETA reflect real work instead of being decorative.
 
 ## Files
 
