@@ -7,7 +7,7 @@
  */
 
 const YC = {
-  BUILD: "0.3.0",
+  BUILD: "0.4.0",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -206,7 +206,15 @@ const YC = {
       .filter((s) => /transcript/i.test(s));
     let ts = { rows: [], where: "n/a", groups: 0 };
     try { ts = YC.timestampRows(); } catch {}
+    const vis = YC.visibleTranscriptPanel();
+    const chips = vis
+      ? [...vis.querySelectorAll("chip-view-model, [role='tab']")]
+          .map((c) => (c.textContent || "").trim()).filter(Boolean).join("/")
+      : "";
     return {
+      visiblePanel: vis ? (vis.getAttribute("target-id") || "?") + "=" +
+        (vis.getAttribute("visibility") || "?").replace("ENGAGEMENT_PANEL_VISIBILITY_", "") : "none",
+      chips: chips || "none",
       segmentEls: q("ytd-transcript-segment-renderer"),
       classVariants: q('[class*="transcript-segment"], [class*="segment-renderer"]'),
       transcriptPanels: panels.length ? panels.join(", ") : "none",
@@ -221,8 +229,39 @@ const YC = {
   /* Open YouTube's transcript panel if it is not already showing, so the user
      only has to click once. Needs the description expanded first, because that is
      where the button lives. */
+  /* There is more than one transcript panel in the DOM. Browser inspection of a
+     live watch page (2026-08) found both `PAmodern_transcript_view` and
+     `engagement-panel-searchable-transcript`, and the first one in document order
+     was HIDDEN. Taking querySelector's first match therefore inspected the wrong
+     panel and reported "present (HIDDEN)" while the real one was expanded. */
+  visibleTranscriptPanel() {
+    const panels = [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
+      .filter((p) => /transcript/i.test(p.getAttribute("target-id") || ""));
+    return panels.find((p) => !/HIDDEN/i.test(p.getAttribute("visibility") || "")) || panels[0] || null;
+  },
+
+  /* The panel is tabbed: a chip bar offers "Timeline" and "Transcript", and it can
+     open on Timeline, in which case no transcript rows exist yet. Select the
+     Transcript chip if one is present. */
+  async selectTranscriptChip() {
+    const panel = YC.visibleTranscriptPanel();
+    if (!panel) return false;
+    const chip = [...panel.querySelectorAll("chip-view-model, button, div[role='tab'], [role='tab']")]
+      .find((c) => /^transcript$/i.test((c.textContent || "").trim()));
+    if (!chip) return false;
+    const already = /true/i.test(chip.getAttribute("aria-selected") || "");
+    if (!already) { chip.click(); await YC.sleep(900); }
+    return true;
+  },
+
   async openPanel() {
     if (YC.fromPanel()) return true;
+
+    // panel may already be open but showing the Timeline tab
+    if (YC.visibleTranscriptPanel()) {
+      await YC.selectTranscriptChip();
+      for (let i = 0; i < 12; i++) { await YC.sleep(300); if (YC.fromPanel()) return true; }
+    }
 
     // The button lives inside the (collapsed) description, so expand that first.
     for (const sel of ["#description-inline-expander #expand", "tp-yt-paper-button#expand",
@@ -260,7 +299,14 @@ const YC = {
     if (!btn) return false;
 
     btn.click();
-    for (let i = 0; i < 25; i++) { await YC.sleep(320); if (YC.fromPanel()) return true; }
+    await YC.sleep(900);
+    // the panel can open on the Timeline tab, so select Transcript before waiting
+    await YC.selectTranscriptChip();
+    for (let i = 0; i < 25; i++) {
+      await YC.sleep(320);
+      if (YC.fromPanel()) return true;
+      if (i === 8) await YC.selectTranscriptChip();   // retry once as it renders
+    }
     return !!YC.fromPanel();
   },
 
@@ -378,6 +424,7 @@ const YC = {
         const err = new Error(
           "Could not read the transcript.\n" +
           `panels: ${d.transcriptPanels}\n` +
+          `visible panel: ${d.visiblePanel}  chips: ${d.chips}\n` +
           `elements: ${d.segmentEls} segment, ${d.classVariants} class-variant\n` +
           `timestamp rows in page: ${d.timestampRowsFound} (under <${d.timestampRowsUnder}>, ${d.timestampGroups} groups)\n` +
           `strategy: ${d.strategy}\n` +
