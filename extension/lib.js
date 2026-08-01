@@ -7,6 +7,7 @@
  */
 
 const YC = {
+  BUILD: "0.3.0",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
