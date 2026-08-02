@@ -25,6 +25,7 @@
     el.innerHTML = `
       <div class="yc-head">
         <span class="yc-brand">You<span class="yc-blade"></span>Chop</span>
+        <span class="yc-ver" id="yc-ver"></span>
         <span class="yc-meta" id="yc-meta"></span>
         <button class="yc-x" id="yc-close" title="Close">&times;</button>
       </div>
@@ -46,6 +47,10 @@
       <textarea class="yc-out" id="yc-out" readonly></textarea>
       <div class="yc-foot" id="yc-foot"></div>`;
     document.body.appendChild(el);
+    // Always show the running build. A stale content script is invisible otherwise:
+    // reloading the extension does not replace scripts already injected into open
+    // tabs, so an old version can keep answering long after the files changed.
+    $("#yc-ver", el).textContent = "v" + (typeof YC !== "undefined" ? YC.BUILD : "?");
     $("#yc-close", el).onclick = closePanel;
     return el;
   }
