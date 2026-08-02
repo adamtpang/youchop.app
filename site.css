@@ -524,6 +524,9 @@ textarea.tool-input { resize: vertical; min-height: 120px; line-height: 1.6; wid
 }
 .err-box.show { display: block; }
 .err-box code { font-family: var(--mono); font-size: 12px; color: var(--amber); }
+/* Same box, neutral tone: for results that are correct but incomplete, which is
+   information rather than a failure. */
+.err-box.note { background: #241f10; border-color: var(--amber); color: #f0dfb0; }
 
 @media (max-width: 820px) {
   .steps, .native-grid, .price-grid, .offer-grid { grid-template-columns: 1fr; }

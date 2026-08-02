@@ -169,9 +169,20 @@
   // ---- helpers ----
   function showErr(msg, detail) {
     var e = $("err"); e.innerHTML = msg + (detail ? ' <code>' + detail + '</code>' : "");
-    e.classList.add("show");
+    e.classList.add("show"); e.classList.remove("note");
   }
   function clearErr() { $("err").classList.remove("show"); }
+  // Not an error: a neutral note, used when a result is correct but incomplete.
+  function showNote(msg) {
+    var e = $("err"); e.textContent = msg;
+    e.classList.add("show"); e.classList.add("note");
+  }
+  function clock(sec) {
+    sec = Math.floor(Number(sec) || 0);
+    if (!sec) return "";
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(s).padStart(2, "0");
+  }
   function toast(t) { var el = $("toast"); el.textContent = t; el.classList.add("show"); setTimeout(function(){ el.classList.remove("show"); }, 1400); }
   function esc(s) { return String(s == null ? "" : s); }
   function q(o) { return Object.keys(o).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
@@ -280,10 +291,14 @@
       if (!r.ok) { $("videos-panel").classList.remove("show"); showErr(errMsg(d, r.status), d.message || ""); return; }
       if (!d.videos || !d.videos.length) { $("videos-panel").classList.remove("show"); return showErr("That channel has no listable videos."); }
       state.channel = (d.channel && d.channel.title) || cand.title;
-      $("chan-name").textContent = "· " + state.channel + (d.truncated ? " (first " + d.videos.length + ")" : "");
+      $("chan-name").textContent = "· " + state.channel + (d.truncated ? " (most recent " + d.videos.length + ")" : "");
       state.transcripts = {};
-      state.videos = d.videos.map(function (v) { return { videoId: v.videoId, title: v.title, published: v.published, selected: true, state: "pend" }; });
+      state.videos = d.videos.map(function (v) {
+        return { videoId: v.videoId, title: v.title, published: v.published, duration: clock(v.seconds), selected: true, state: "pend" };
+      });
       renderList();
+      // Say so when the list is capped, rather than letting 200 of 2,230 look complete.
+      if (d.note) showNote(d.note);
     } catch (e) { $("videos-panel").classList.remove("show"); showErr("Request failed.", String(e.message || e)); }
   }
 
@@ -323,7 +338,8 @@
 
   function errMsg(d, status) {
     var e = d && d.error;
-    if (e === "no_data_key") return "Channel search isn't wired up yet, the server needs a free YouTube Data API key (YT_DATA_API_KEY). You can still use Paste video links.";
+    if (e === "lookup_failed") return "Couldn't find that channel. Try the exact @handle, or paste the channel URL.";
+    if (e === "no_data_key") return "Channel lookup is misconfigured on the server.";
     if (e === "quota_exceeded") return "YouTube Data API daily quota is used up (resets midnight Pacific). Try again tomorrow, or use Paste video links.";
     if (e === "channel_not_found" || e === "no_uploads") return "Couldn't find that channel's videos. Try the exact @handle or the channel URL.";
     if (e === "no_apify_token" || e === "no_supadata_key" || e === "no_ytio_token" || e === "no_provider") return "The transcript backend isn't configured yet, set a free key in the server env (APIFY_TOKEN or SUPADATA_API_KEY).";
