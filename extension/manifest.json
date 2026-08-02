@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouChop: 1-click YouTube transcripts",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Grab any YouTube video's transcript in one click. Clean text for Claude, ChatGPT or Cursor. Runs locally: no account, no API key, nothing leaves your machine.",
   "permissions": [
     "clipboardWrite",
@@ -18,6 +18,9 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "action": {
     "default_title": "YouChop",

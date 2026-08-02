@@ -2,6 +2,10 @@
    and renders the result in a panel. All work happens locally in this tab. */
 (function () {
   "use strict";
+  // Marks the tab as wired so the service worker can re-inject lib.js on update
+  // without stacking a second observer and interval on top of this one.
+  if (window.__youchopWired) return;
+  window.__youchopWired = true;
   const BTN_ID = "youchop-btn";
   const PANEL_ID = "youchop-panel";
   let lastVideoId = null;

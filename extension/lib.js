@@ -6,8 +6,12 @@
  * cannot take, and it is why the extension is the cheapest possible extractor.
  */
 
-const YC = {
-  BUILD: "0.6.0",
+/* `var`, not `const`, on purpose: the service worker re-runs this file inside tabs
+   that are already open when the extension updates. `const` would throw "already
+   declared" and leave the stale build in place; `var` replaces the object, and the
+   running content script picks the new one up because it looks YC up globally. */
+var YC = {
+  BUILD: "0.7.0",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -142,12 +146,20 @@ const YC = {
       return sec === null || !text ? null : { t: sec, text: text.trim() };
     };
 
-    // 1. the documented custom element
-    let rows = [...document.querySelectorAll("ytd-transcript-segment-renderer")]
-      .map((s) => mk(s.querySelector(".segment-timestamp")?.textContent || "",
-                     s.querySelector(".segment-text")?.textContent || ""))
-      .filter(Boolean);
-    if (rows.length) { YC.lastPanelStrategy = "ytd-transcript-segment-renderer"; return rows; }
+    // 1. the row element itself. `transcript-segment-view-model` is what YouTube
+    //    actually renders (confirmed by inspecting a live watch page, 2026-08);
+    //    `ytd-transcript-segment-renderer` is the older name and no longer exists.
+    //    Cheap and exact, so it runs first; the structural scan below is the net
+    //    for whenever these get renamed again.
+    let rows = [];
+    for (const seg of document.querySelectorAll("transcript-segment-view-model, ytd-transcript-segment-renderer")) {
+      const stampEl = [...seg.querySelectorAll("*")]
+        .find((e) => /^\d{1,2}:\d{2}(?::\d{2})?$/.test((e.textContent || "").trim()));
+      if (!stampEl) continue;
+      const r = mk(stampEl.textContent.trim(), YC.rowText(seg, stampEl));
+      if (r) rows.push(r);
+    }
+    if (rows.length) { YC.lastPanelStrategy = "transcript-segment-view-model"; return rows; }
 
     // 2. class-name variants, in case the element was renamed
     rows = [...document.querySelectorAll('[class*="transcript-segment"], [class*="segment-renderer"]')]
@@ -170,45 +182,35 @@ const YC = {
     return null;
   },
 
-  /* Every leaf element in the document whose text starts with a timestamp,
-     grouped by parent; the biggest group is the transcript. Chapter lists and
-     timestamped comments form much smaller groups, so size disambiguates them
-     without depending on any YouTube class name. */
+  /* Every element in the document whose entire text is a timestamp, grouped by the
+     tag+class signature of the row around it; the biggest group is the transcript.
+     Chapter lists, the video wall and timestamped comments form much smaller
+     groups, so size disambiguates them without depending on any YouTube name. */
   timestampRows() {
-    const byParent = new Map();
-    const add = (key, stamp, text) => {
-      if (!text) return;
-      if (!byParent.has(key)) byParent.set(key, []);
-      byParent.get(key).push({ stamp, text: text.replace(/\s+/g, " ").trim() });
-    };
-
-    // Layout A: one element holds "0:17 some text".
-    // Whitespace after the stamp is OPTIONAL: when YouTube renders the stamp and
-    // the text as adjacent spans, textContent concatenates to "0:17some text"
-    // with no separator, and requiring \s+ here missed every row.
-    const RX = /^(\d{1,2}:\d{2}(?::\d{2})?)\s*(\S[\s\S]{0,800})$/;
-    for (const el of document.querySelectorAll("div, li, button, span, yt-formatted-string, a")) {
-      if (el.querySelector("div, li, button")) continue;      // leaf-ish rows only
-      const m = (el.textContent || "").trim().match(RX);
-      if (m) add(el.parentElement || el, m[1], m[2]);
-    }
-
-    // Layout B: the stamp is its own element and the text is a sibling. Find
-    // elements whose entire text IS a timestamp, then read the row from the parent.
     const ONLY = /^(\d{1,2}:\d{2}(?::\d{2})?)$/;
-    for (const el of document.querySelectorAll("span, div, button, yt-formatted-string, a")) {
-      const t = (el.textContent || "").trim();
-      const m = t.match(ONLY);
+    const bySig = new Map();
+
+    for (const el of document.querySelectorAll("div, span, button, a, yt-formatted-string")) {
+      const txt = (el.textContent || "").trim();
+      const m = txt.match(ONLY);
       if (!m) continue;
-      const row = el.parentElement;
+      // Climb past wrappers that add nothing, so `row` is the first ancestor that
+      // holds words as well as the stamp.
+      let stampEl = el, row = el.parentElement;
+      while (row && (row.textContent || "").trim() === txt) { stampEl = row; row = row.parentElement; }
       if (!row) continue;
-      const whole = (row.textContent || "").trim();
-      const rest = whole.startsWith(t) ? whole.slice(t.length) : whole.replace(t, "");
-      if (rest.trim().length > 1) add(row.parentElement || row, m[1], rest);
+      const text = YC.rowText(row, stampEl);
+      if (text.length < 2) continue;
+      // Group by the row's tag+class SIGNATURE, not by parent identity. Every row
+      // sits in its own wrapper, so grouping by parentElement produced one row per
+      // group and the transcript never out-sized the chapter list.
+      const sig = row.tagName + "|" + (row.className || "").toString();
+      if (!bySig.has(sig)) bySig.set(sig, []);
+      bySig.get(sig).push({ stamp: m[1], text });
     }
 
-    let best = [], bestKey = null;
-    for (const [k, v] of byParent) if (v.length > best.length) { best = v; bestKey = k; }
+    let best = [], bestSig = null;
+    for (const [k, v] of bySig) if (v.length > best.length) { best = v; bestSig = k; }
     const seen = new Set(), rows = [];
     for (const r of best) {
       const sec = YC.toSec(r.stamp);
@@ -217,7 +219,25 @@ const YC = {
       rows.push({ t: sec, text: r.text });
     }
     rows.sort((a, b) => a.t - b.t);
-    return { rows, where: bestKey ? (bestKey.tagName || "?").toLowerCase() : "none", groups: byParent.size };
+    return { rows, where: bestSig ? bestSig.split("|")[0].toLowerCase() : "none", groups: bySig.size };
+  },
+
+  /* Read one row's words. YouTube puts a screen-reader duration label between the
+     stamp and the text, so a row's raw textContent is "0:07" + "7 seconds" +
+     "This program is...". Reading textContent directly bakes "7 seconds" into
+     every single line, so drop that label and the stamp and keep the rest. */
+  A11Y_LABEL: /^\d+\s+(hour|minute|second)s?([\s,]+\d+\s+(minute|second)s?)*$/i,
+
+  rowText(row, stampEl) {
+    const parts = [];
+    for (const kid of row.children) {
+      if (kid === stampEl || kid.contains(stampEl)) continue;
+      const t = (kid.textContent || "").trim();
+      if (!t || YC.A11Y_LABEL.test(t)) continue;
+      if (/a11y|visually-hidden|sr-only/i.test((kid.className || "").toString())) continue;
+      parts.push(t);
+    }
+    return parts.join(" ").replace(/\s+/g, " ").trim();
   },
 
   /* How many elements contain nothing but a timestamp. This distinguishes
