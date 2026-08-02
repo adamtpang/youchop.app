@@ -7,7 +7,7 @@
  */
 
 const YC = {
-  BUILD: "0.5.0",
+  BUILD: "0.6.0",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -176,15 +176,37 @@ const YC = {
      without depending on any YouTube class name. */
   timestampRows() {
     const byParent = new Map();
-    const RX = /^(\d{1,2}:\d{2}(?::\d{2})?)\s+(\S[\s\S]{0,800})$/;
+    const add = (key, stamp, text) => {
+      if (!text) return;
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key).push({ stamp, text: text.replace(/\s+/g, " ").trim() });
+    };
+
+    // Layout A: one element holds "0:17 some text".
+    // Whitespace after the stamp is OPTIONAL: when YouTube renders the stamp and
+    // the text as adjacent spans, textContent concatenates to "0:17some text"
+    // with no separator, and requiring \s+ here missed every row.
+    const RX = /^(\d{1,2}:\d{2}(?::\d{2})?)\s*(\S[\s\S]{0,800})$/;
     for (const el of document.querySelectorAll("div, li, button, span, yt-formatted-string, a")) {
       if (el.querySelector("div, li, button")) continue;      // leaf-ish rows only
       const m = (el.textContent || "").trim().match(RX);
-      if (!m) continue;
-      const key = el.parentElement || el;
-      if (!byParent.has(key)) byParent.set(key, []);
-      byParent.get(key).push({ stamp: m[1], text: m[2].replace(/\s+/g, " ") });
+      if (m) add(el.parentElement || el, m[1], m[2]);
     }
+
+    // Layout B: the stamp is its own element and the text is a sibling. Find
+    // elements whose entire text IS a timestamp, then read the row from the parent.
+    const ONLY = /^(\d{1,2}:\d{2}(?::\d{2})?)$/;
+    for (const el of document.querySelectorAll("span, div, button, yt-formatted-string, a")) {
+      const t = (el.textContent || "").trim();
+      const m = t.match(ONLY);
+      if (!m) continue;
+      const row = el.parentElement;
+      if (!row) continue;
+      const whole = (row.textContent || "").trim();
+      const rest = whole.startsWith(t) ? whole.slice(t.length) : whole.replace(t, "");
+      if (rest.trim().length > 1) add(row.parentElement || row, m[1], rest);
+    }
+
     let best = [], bestKey = null;
     for (const [k, v] of byParent) if (v.length > best.length) { best = v; bestKey = k; }
     const seen = new Set(), rows = [];
@@ -196,6 +218,17 @@ const YC = {
     }
     rows.sort((a, b) => a.t - b.t);
     return { rows, where: bestKey ? (bestKey.tagName || "?").toLowerCase() : "none", groups: byParent.size };
+  },
+
+  /* How many elements contain nothing but a timestamp. This distinguishes
+     "the transcript is not rendered" from "it is rendered in a layout we did not
+     parse", which the previous diagnostic could not tell apart. */
+  stampOnlyCount() {
+    let n = 0;
+    for (const el of document.querySelectorAll("span, div, button, yt-formatted-string, a")) {
+      if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test((el.textContent || "").trim())) n++;
+    }
+    return n;
   },
 
   /* What the page looks like right now, for honest error reporting. */
@@ -221,6 +254,7 @@ const YC = {
       timestampRowsFound: ts.rows.length,
       timestampRowsUnder: ts.where,
       timestampGroups: ts.groups,
+      stampOnly: (() => { try { return YC.stampOnlyCount(); } catch { return -1; } })(),
       strategy: YC.lastPanelStrategy || "none matched",
       duration: YC.videoDuration(),
     };
@@ -426,7 +460,7 @@ const YC = {
           `panels: ${d.transcriptPanels}\n` +
           `visible panel: ${d.visiblePanel}  chips: ${d.chips}\n` +
           `elements: ${d.segmentEls} segment, ${d.classVariants} class-variant\n` +
-          `timestamp rows in page: ${d.timestampRowsFound} (under <${d.timestampRowsUnder}>, ${d.timestampGroups} groups)\n` +
+          `timestamp rows in page: ${d.timestampRowsFound} (under <${d.timestampRowsUnder}>, ${d.timestampGroups} groups), stamp-only elements: ${d.stampOnly}\n` +
           `strategy: ${d.strategy}\n` +
           `captions: ${YC.lastCaptionNote || "not reached"}\n` +
           `youchop.app: ${net ? "BLOCKED. Remove and re-add the extension so Chrome grants the new host permission (a plain reload does not always do it)." : String(e.message || e)}\n` +
