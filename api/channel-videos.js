@@ -12,6 +12,10 @@
 
 const BASE = "https://www.googleapis.com/youtube/v3";
 const MAX_VIDEOS = 2000; // hard cap so a giant channel can't run away
+const VIDEOS_TAB = "EgZ2aWRlb3PyBgQKAjoA"; // browse params selecting a channel's Videos tab
+// Vercel kills a Hobby function at 10s. Stay under it so a large channel returns a
+// partial, labelled list instead of a 504 with nothing in it.
+const BUDGET_MS = Number(process.env.CHANNEL_LIST_BUDGET_MS || 8000);
 
 // The web client key is a public constant embedded in youtube.com's own JavaScript.
 // It identifies the client, it is not a credential and grants no private access.
@@ -130,8 +134,11 @@ function harvest(node, out, state) {
     });
   }
 
+  // Keep the FIRST continuation token, not the last. A page can carry more than one
+  // (the grid's, plus one belonging to a side shelf), and following the last one
+  // dead-ends after a single page. Taking the first walks the whole channel.
   const c = node.continuationItemRenderer;
-  if (c?.continuationEndpoint?.continuationCommand) {
+  if (c?.continuationEndpoint?.continuationCommand && !state.token) {
     state.token = c.continuationEndpoint.continuationCommand.token;
   }
   for (const k of Object.keys(node)) harvest(node[k], out, state);
@@ -142,35 +149,38 @@ async function listKeyless(inp) {
   // echoing the raw UC… string back put a channel id in the page header.
   const { id, title } = await channelMeta(inp);
 
-  // A channel's uploads playlist is its id with the UC prefix swapped for UU.
-  const uploads = "UU" + id.slice(2);
   const out = { videos: [], seen: new Set() };
-  let token = "", truncated = false, pages = 0;
+  let token = "", truncated = false, reason = "", pages = 0;
 
+  // Walk the channel's Videos tab. The uploads playlist (VL+UU…) lists videos too,
+  // but its continuation dead-ends after two pages. Measured on Y Combinator: 641
+  // videos over 22 pages here, versus 200 there.
+  const start = Date.now();
   do {
     const state = { token: "" };
-    const data = await innertube(token ? { continuation: token } : { browseId: "VL" + uploads });
+    const data = await innertube(
+      token ? { continuation: token } : { browseId: id, params: VIDEOS_TAB }
+    );
     harvest(data, out, state);
     token = state.token;
-    if (out.videos.length >= MAX_VIDEOS) { truncated = true; break; }
-    if (++pages > 40) { truncated = true; break; } // belt and braces
+    if (out.videos.length >= MAX_VIDEOS) { truncated = true; reason = "cap"; break; }
+    if (++pages > 150) { truncated = true; reason = "cap"; break; }
+    // A serverless function is killed at its timeout, which would turn a large
+    // channel into an opaque 504. Stop early and say so instead.
+    if (Date.now() - start > BUDGET_MS) { truncated = true; reason = "time"; break; }
   } while (token);
 
   if (!out.videos.length) throw new Error("no videos parsed");
 
-  // Measured, not assumed: the keyless continuation stops after 200 uploads however
-  // large the channel is. Adding visitorData or using the Videos tab instead of the
-  // uploads playlist does not lift it. So a full result and a capped one look
-  // identical from here, and the only honest move is to say which we think it is
-  // rather than silently returning 200 of 2,230 as though it were everything.
-  const capped = !token && out.videos.length >= 200;
   return {
     channel: { title, id },
     videos: out.videos,
-    truncated: truncated || capped,
+    truncated,
     via: "keyless",
-    note: (truncated || capped)
-      ? `Showing the ${out.videos.length} most recent uploads, which is as far as channel listing reaches. For older videos, use Paste video links.`
+    note: truncated
+      ? (reason === "time"
+          ? `This channel is large, so listing stopped at ${out.videos.length} videos to stay inside the request time budget. Use Paste video links to reach older ones.`
+          : `Listing stopped at ${out.videos.length} videos, the per-request maximum.`)
       : null,
   };
 }
