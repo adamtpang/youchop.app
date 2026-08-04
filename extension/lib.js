@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.7.0",
+  BUILD: "0.8.0",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -172,15 +172,39 @@ var YC = {
     //    guessing which element wraps the transcript is what broke strategies 1
     //    and 2. A transcript is simply the largest cluster of sibling rows whose
     //    text begins with a timestamp, so find that instead of naming anything.
+    //
+    //    NOT a substitute for strategies 1/2, only a net for when they are renamed
+    //    again: a live watch page (2026-08) had zero transcript-segment-view-model
+    //    rows because the panel's own list hadn't finished rendering yet, and this
+    //    scan's biggest cluster turned out to be the CHAPTERS panel instead
+    //    (ytd-macro-markers-list-item-renderer, in a separate hidden panel), whose
+    //    rows each also repeat their own title twice internally. The result was a
+    //    "successful" extraction that was actually the chapter list, doubled. So
+    //    known non-transcript containers are excluded before ranking groups, and
+    //    a match is required to look genuinely per-line: the video's total runtime
+    //    divided by the number of rows must be under 40s/row. Chapter markers are
+    //    typically 2-6 minutes apart; real caption lines are a few seconds apart.
     const hits = YC.timestampRows();
-    if (hits.rows.length >= 5) {
+    const duration = YC.videoDuration();
+    const perRow = duration && hits.rows.length ? duration / hits.rows.length : 0;
+    if (hits.rows.length >= 5 && (!perRow || perRow <= 40)) {
       YC.lastPanelStrategy = `structural (${hits.rows.length} rows under ${hits.where})`;
       return hits.rows;
     }
+    if (hits.rows.length >= 5) {
+      YC.lastPanelStrategy = `rejected structural match: ${hits.rows.length} rows under ${hits.where}, ` +
+        `~${Math.round(perRow)}s apart (looks like chapters, not per-line captions)`;
+    }
 
-    YC.lastPanelStrategy = null;
+    YC.lastPanelStrategy = YC.lastPanelStrategy && /^rejected/.test(YC.lastPanelStrategy) ? YC.lastPanelStrategy : null;
     return null;
   },
+
+  // Containers that are known to render "MM:SS  words" text but are never the
+  // transcript: chapters, the end-screen video wall, related-video cards, the
+  // player's own scrubber, and the description (which often lists chapters as
+  // plain text, rendered once collapsed and again expanded).
+  NOT_TRANSCRIPT: /macro-markers|ytp-chrome-bottom|ytp-modern-videowall|ytLockupViewModel|description|ytAttributedString/i,
 
   /* Every element in the document whose entire text is a timestamp, grouped by the
      tag+class signature of the row around it; the biggest group is the transcript.
@@ -199,6 +223,7 @@ var YC = {
       let stampEl = el, row = el.parentElement;
       while (row && (row.textContent || "").trim() === txt) { stampEl = row; row = row.parentElement; }
       if (!row) continue;
+      if (YC.NOT_TRANSCRIPT.test(row.className || "") || row.closest('[class*="macro-markers"], [id*="description"]')) continue;
       const text = YC.rowText(row, stampEl);
       if (text.length < 2) continue;
       // Group by the row's tag+class SIGNATURE, not by parent identity. Every row
@@ -216,10 +241,21 @@ var YC = {
       const sec = YC.toSec(r.stamp);
       if (sec === null || seen.has(sec)) continue;
       seen.add(sec);
-      rows.push({ t: sec, text: r.text });
+      rows.push({ t: sec, text: YC.dedupeInternalRepeat(r.text) });
     }
     rows.sort((a, b) => a.t - b.t);
     return { rows, where: bestSig ? bestSig.split("|")[0].toLowerCase() : "none", groups: bySig.size };
+  },
+
+  // A row whose assembled text is the same phrase twice back-to-back (seen on
+  // chapter rows, which render their title in two children for hover/base states)
+  // collapses to one copy. Harmless on genuine transcript text, which never
+  // legitimately repeats its exact sentence immediately against itself.
+  dedupeInternalRepeat(text) {
+    const n = text.length;
+    if (n < 4 || n % 2 !== 0) return text;
+    const half = n / 2;
+    return text.slice(0, half) === text.slice(half) ? text.slice(0, half) : text;
   },
 
   /* Read one row's words. YouTube puts a screen-reader duration label between the
