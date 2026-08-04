@@ -137,6 +137,9 @@ async function withKey(c, key) {
 }
 
 module.exports = async (req, res) => {
+  // Same public, credential-free endpoint whether called from youchop.app or,
+  // potentially, an extension surface, so answer any origin rather than assume one.
+  res.setHeader("Access-Control-Allow-Origin", "*");
   const q = (req.query && (req.query.q || req.query.handle || req.query.channel)) || "";
   const c = classify(q);
   if (!c) return res.status(400).json({ error: "Provide ?q= a channel name, @handle, or URL." });

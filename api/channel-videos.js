@@ -229,6 +229,9 @@ async function listWithKey(inp, key) {
 }
 
 module.exports = async (req, res) => {
+  // Same public, credential-free endpoint whether called from youchop.app or,
+  // potentially, an extension surface, so answer any origin rather than assume one.
+  res.setHeader("Access-Control-Allow-Origin", "*");
   const q = req.query || {};
   const inp = resolveInput(q);
   if (!inp) return res.status(400).json({ error: "Provide ?channelId=UC…, ?handle=@name, or ?url=…" });

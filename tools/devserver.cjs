@@ -20,14 +20,21 @@ http.createServer(async (req, res) => {
     if (!fs.existsSync(file)) { res.writeHead(404); return res.end("no such api"); }
     delete require.cache[require.resolve(file)];
     const handler = require(file);
+    req.query = u.query; // real req/res, so req.on(...) still works for POST bodies
     const shim = {
+      _headers: {},
       status(c) { this._c = c; return this; },
+      setHeader(k, v) { this._headers[k] = v; return this; },
       json(b) {
-        res.writeHead(this._c || 200, { "content-type": "application/json" });
+        res.writeHead(this._c || 200, { "content-type": "application/json", ...this._headers });
         res.end(JSON.stringify(b));
       },
+      end(b) {
+        res.writeHead(this._c || 200, this._headers);
+        res.end(b);
+      },
     };
-    try { await handler({ query: u.query, method: req.method }, shim); }
+    try { await handler(req, shim); }
     catch (e) { res.writeHead(500); res.end(String(e && e.message)); }
     return;
   }

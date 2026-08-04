@@ -273,7 +273,25 @@ async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock })
   return { ok: false, status: lastError.status, body: lastError.body };
 }
 
+// This endpoint has to be reachable cross-origin: the Chrome extension's content
+// script calls it from a youtube.com tab, not from youchop.app. Chrome extension
+// host_permissions are meant to exempt such calls from CORS, but that exemption is
+// not something to rely on blind: with no Access-Control-Allow-Origin header at
+// all, and OPTIONS previously falling through to the 405 below, any fetch that
+// wasn't exempted for whatever reason (a browser difference, a permission that
+// didn't take, anything) failed outright with "Failed to fetch" before the request
+// body was ever read. Nothing here is user-specific or credentialed, so a public
+// endpoint answering any origin closes that gap rather than guessing whose fetch
+// implementation honors the extension exemption.
+function setCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 module.exports = async (req, res) => {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   const body = await readJson(req);
   const result = await fetchTranscripts({
