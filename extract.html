@@ -164,7 +164,7 @@
   var GAP_MS = 1200;    // spacing between batches
 
   var $ = function (id) { return document.getElementById(id); };
-  var state = { videos: [], transcripts: {}, format: "clean", channel: "" };
+  var state = { videos: [], transcripts: {}, format: "clean", channel: "", failReasons: {} };
 
   // ---- helpers ----
   function showErr(msg, detail) {
@@ -332,7 +332,18 @@
     setTimeout(function () { $("progress").classList.remove("show"); $("pbar-fill").style.width = "0%"; }, 400);
     $("single-btn").textContent = "Get transcript"; $("single-btn").disabled = false;
     if (state.transcripts[id]) { render(); histSave(); }
-    else if (okB) showErr("No transcript available for that video, it may have captions disabled.");
+    else if (okB) {
+      // Don't assert "captions disabled" as fact: YouTube usually has captions and
+      // the third-party provider fetching them can fail on a specific video even
+      // when it works fine on others. Say what's actually known, and point at the
+      // Chrome extension, which reads YouTube's captions directly and isn't subject
+      // to this provider's per-video failures.
+      var reason = state.failReasons[id];
+      showErr(
+        "Couldn't get a transcript for that video from our provider" + (reason ? " (" + reason + ")" : "") + ".",
+        "If the video does have captions on YouTube, the YouChop Chrome extension reads them directly from the page and usually works when this doesn't."
+      );
+    }
   };
   $("single-input").addEventListener("keydown", function (e) { if (e.key === "Enter") $("single-btn").click(); });
 
@@ -398,7 +409,12 @@
           state.transcripts[x.v.videoId] = t;
           if (!x.v.title && t.title) { x.v.title = t.title; }
           setState(x.i, "done");
-        } else { setState(x.i, "fail"); }
+        } else {
+          // The provider answered but had nothing for this specific video. Keep
+          // whatever reason it gave, rather than guessing at one client-side.
+          state.failReasons[x.v.videoId] = (t && t.reason) || "";
+          setState(x.i, "fail");
+        }
       });
       return true;
     } catch (e) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr("Batch failed.", String(e.message || e)); return false; }

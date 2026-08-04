@@ -100,7 +100,7 @@ async function viaApify(ids, withTs, debug) {
 
 /* ---------- provider: supadata (free 100/mo) ---------- */
 function normalizeSupadata(id, data, withTs) {
-  if (!data) return { videoId: id, title: "", author: "", ok: false, text: "" };
+  if (!data) return { videoId: id, title: "", author: "", ok: false, text: "", reason: "no response body" };
   let text = "";
   if (typeof data.content === "string") text = data.content.trim();
   else if (Array.isArray(data.content)) {
@@ -109,7 +109,13 @@ function normalizeSupadata(id, data, withTs) {
       return withTs && s.offset != null ? "[" + hms(Math.floor(Number(s.offset) / 1000)) + "] " + t : t;
     }).filter(Boolean).join(withTs ? "\n" : " ");
   }
-  return { videoId: id, title: "", author: "", language: data.lang || "", ok: !!text, text };
+  const out = { videoId: id, title: "", author: "", language: data.lang || "", ok: !!text, text };
+  // Supadata can answer HTTP 200 with no transcript, e.g. its own scrape failed for
+  // this specific video even though YouTube itself serves captions fine. Carry
+  // whatever it says why, so the client isn't left guessing "captions disabled"
+  // when that isn't actually what happened.
+  if (!out.ok) out.reason = data.error || data.message || data.code || "provider returned no transcript";
+  return out;
 }
 async function viaSupadata(ids, withTs, debug, lang) {
   const key = process.env.SUPADATA_API_KEY;
@@ -138,15 +144,16 @@ async function viaSupadata(ids, withTs, debug, lang) {
       let r = await fetchOne(id, true);
       let data = await r.json().catch(() => null);
       if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
-      let out = r.ok ? normalizeSupadata(id, data, withTs) : null;
-      if (!out || !out.ok) {
+      let out = r.ok ? normalizeSupadata(id, data, withTs) : { videoId: id, title: "", author: "", ok: false, text: "", reason: `provider HTTP ${r.status}` };
+      if (!out.ok) {
         // preferred language track missing, take whatever the video has
         r = await fetchOne(id, false);
         data = await r.json().catch(() => null);
         if (r.status === 401 || r.status === 402 || r.status === 403) { hardError = { status: r.status, body: { error: "supadata_error", status: r.status, detail: data } }; return null; }
         if (r.ok) out = normalizeSupadata(id, data, withTs);
+        else out.reason = out.reason || `provider HTTP ${r.status}`;
       }
-      return out || { videoId: id, title: "", author: "", ok: false, text: "" };
+      return out;
     }));
     settled.forEach((x) => { if (x) results.push(x); });
   }
