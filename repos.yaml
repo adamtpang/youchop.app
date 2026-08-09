@@ -1,0 +1,22 @@
+# repos.yaml v0 — see github.com/adamtpang/repo-protocol
+repo: youchop.app
+is: Bulk YouTube chapterization for a creator's entire back-catalog, priced against named competitors who charge per video.
+url: https://youchop.app
+cluster: creator-tools
+
+provides:
+  - id: chapterize
+    what: transcript-to-chapters serverless function, the paid core of the product
+    at: api/chapterize.js
+  - id: viewer-extension
+    what: free Chrome extension that renders chapters in-player, the distribution/lead-gen wedge for the paid creator product
+    at: extension/manifest.json
+  - id: competitive-strategy
+    what: the researched moat, kill gates, and named competitor pricing (TimeSkip, ChapterMe) that the offer is priced against
+    at: STRATEGY.md
+
+stack: [vercel-functions, chrome-extension]
+
+kin: []
+
+canon: none yet

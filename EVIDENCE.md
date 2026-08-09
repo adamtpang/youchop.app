@@ -31,7 +31,7 @@ Updated 2026-07-28 (upgrade session: self-serve chapterize).
 
 | Field | Value |
 | --- | --- |
-| Buyer | (none yet, free self-serve ships first) |
+| Buyer | YouTube creators (and editors/agencies for 5-20 channels) in tutorial/education/podcast/interview niches, ~10k-500k subs, 100+ unchaptered videos, logged 2026-08-09 from NORTH_STAR.md; no paying buyer yet, free self-serve ships first |
 | Problem | Unchaptered long-form / back-catalog invisible to Key Moments |
 | Cure | Transcript → paste-ready topic chapters |
 | Price paid | $0 free path; $99 pack |
