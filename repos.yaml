@@ -14,9 +14,18 @@ provides:
   - id: competitive-strategy
     what: the researched moat, kill gates, and named competitor pricing (TimeSkip, ChapterMe) that the offer is priced against
     at: STRATEGY.md
+  - id: corpus-extraction
+    what: free, keyless bulk YouTube-channel-to-transcript extraction (yt-dlp on a residential IP, no API quota), the engine behind every corpus in summon.company/knowledge
+    at: tools/corpus.mjs
 
 stack: [vercel-functions, chrome-extension]
 
-kin: []
+kin:
+  - repo: summon.company
+    why: tools/corpus.mjs is the extraction engine; every corpus in summon.company/knowledge (Vervaeke, Sequoia, Y Combinator, GDC, and dozens more) was built by running it. youchop.app is the extractor, summon.company is the destination.
+  - repo: summon.guide
+    why: summon.guide's figure grounding (src/lib/figureSources.ts) is built from curated episodes youchop.app extracted, e.g. the John Vervaeke figure's 6 sourced episodes trace directly back to a youchop.app corpus run.
+  - repo: skill.supply
+    why: skill.supply's research discipline (verifying claims like Naval Ravikant's actual words against a real transcript rather than a paraphrase) is exactly what tools/corpus.mjs is built for; skill.supply can pull a full channel or episode corpus through youchop.app instead of relying on search-snippet paraphrase for grounding
 
 canon: none yet
