@@ -62,10 +62,10 @@
     <!-- CHANNEL MODE -->
     <div id="mode-channel" style="display:none">
       <div class="input-row">
-        <input class="tool-input" id="channel-input" placeholder="Search by name, “Veritasium”, or paste @handle / channel URL" autocomplete="off" />
+        <input class="tool-input" id="channel-input" placeholder="Search by name, “Veritasium”, or paste @handle / channel / playlist URL" autocomplete="off" />
         <button class="btn btn-red" id="find-btn">Search</button>
       </div>
-      <p class="input-hint">Type a channel name and pick it, or paste an @handle / URL to jump straight to its videos.</p>
+      <p class="input-hint">Type a channel name and pick it, paste an @handle / channel URL, or paste a playlist URL to jump straight to its videos.</p>
       <div class="chan-results" id="chan-results"></div>
     </div>
 
@@ -258,10 +258,17 @@
     box.querySelectorAll(".chan-card").forEach(function (el) { el.onclick = function () { loadChannelVideos(cands[+el.dataset.i]); }; });
   }
 
+  function playlistIdFrom(s) {
+    var m = String(s || "").match(/[?&]list=([\w-]+)/);
+    return m ? m[1] : null;
+  }
+
   $("find-btn").onclick = async function () {
     clearErr();
     var qv = $("channel-input").value.trim();
     if (!qv) return showErr("Type a channel name, or paste an @handle / URL.");
+    var listId = playlistIdFrom(qv);
+    if (listId) return loadPlaylistVideos(listId);
     $("find-btn").textContent = "Searching…"; $("find-btn").disabled = true;
     $("chan-results").classList.remove("show");
     try {
@@ -276,6 +283,29 @@
     } catch (e) { showErr("Search failed.", String(e.message || e)); }
     finally { $("find-btn").textContent = "Search"; $("find-btn").disabled = false; }
   };
+
+  async function loadPlaylistVideos(listId) {
+    clearErr();
+    $("chan-results").classList.remove("show");
+    $("videos-panel").classList.add("show");
+    $("vlist").innerHTML = '<div class="pstat" style="padding:20px">Loading playlist…</div>';
+    try {
+      var params = { listId: listId }; if (USE_MOCK) params.mock = "1";
+      var r = await fetch("/api/playlist-videos?" + q(params));
+      var d = await r.json();
+      if (!r.ok) { $("videos-panel").classList.remove("show"); showErr(errMsg(d, r.status), d.message || ""); return; }
+      if (!d.videos || !d.videos.length) { $("videos-panel").classList.remove("show"); return showErr("That playlist has no listable videos."); }
+      state.channel = (d.playlist && d.playlist.title) || "Playlist";
+      $("chan-name").textContent = "· " + state.channel + (d.truncated ? " (first " + d.videos.length + ")" : "");
+      state.transcripts = {};
+      state.videos = d.videos.map(function (v) {
+        return { videoId: v.videoId, title: v.title, published: v.published, duration: clock(v.seconds), selected: true, state: "pend" };
+      });
+      renderList();
+      // Say so when the list is capped, rather than letting a partial list look complete.
+      if (d.note) showNote(d.note);
+    } catch (e) { $("videos-panel").classList.remove("show"); showErr("Request failed.", String(e.message || e)); }
+  }
   $("channel-input").addEventListener("keydown", function (e) { if (e.key === "Enter") $("find-btn").click(); });
 
   async function loadChannelVideos(cand) {
