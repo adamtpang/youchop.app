@@ -187,6 +187,17 @@
   function esc(s) { return String(s == null ? "" : s); }
   function q(o) { return Object.keys(o).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
 
+  // A platform-level failure (timeout, 502/504) answers with a plain-text error
+  // page, not JSON. `r.json()` throws a raw "Unexpected token" SyntaxError on that,
+  // which reads as a client bug rather than what actually happened server-side. Read
+  // as text first so a non-JSON body becomes a readable message with the real
+  // status code, instead of a cryptic parse exception.
+  async function safeJson(r) {
+    var t = await r.text();
+    try { return JSON.parse(t); }
+    catch (e) { return { error: "non_json_response", message: "Server returned a non-JSON response (HTTP " + r.status + "): " + t.slice(0, 150) }; }
+  }
+
   function parseVideoIds(text) {
     var ids = [], seen = {};
     (text || "").split(/[\s,]+/).forEach(function (tok) {
@@ -274,7 +285,7 @@
     try {
       var params = { q: qv }; if (USE_MOCK) params.mock = "1";
       var r = await fetch("/api/channel-search?" + q(params));
-      var d = await r.json();
+      var d = await safeJson(r);
       if (!r.ok) { showErr(errMsg(d, r.status), d.detail && JSON.stringify(d.detail).slice(0, 160)); return; }
       var cands = d.candidates || [];
       if (!cands.length) return showErr("No channels matched “" + qv + "”. Try the exact name, or paste the channel URL.");
@@ -292,7 +303,7 @@
     try {
       var params = { listId: listId }; if (USE_MOCK) params.mock = "1";
       var r = await fetch("/api/playlist-videos?" + q(params));
-      var d = await r.json();
+      var d = await safeJson(r);
       if (!r.ok) { $("videos-panel").classList.remove("show"); showErr(errMsg(d, r.status), d.message || ""); return; }
       if (!d.videos || !d.videos.length) { $("videos-panel").classList.remove("show"); return showErr("That playlist has no listable videos."); }
       state.channel = (d.playlist && d.playlist.title) || "Playlist";
@@ -317,7 +328,7 @@
       var params = cand.channelId ? { channelId: cand.channelId } : { handle: cand.title };
       if (USE_MOCK) params.mock = "1";
       var r = await fetch("/api/channel-videos?" + q(params));
-      var d = await r.json();
+      var d = await safeJson(r);
       if (!r.ok) { $("videos-panel").classList.remove("show"); showErr(errMsg(d, r.status), d.message || ""); return; }
       if (!d.videos || !d.videos.length) { $("videos-panel").classList.remove("show"); return showErr("That channel has no listable videos."); }
       state.channel = (d.channel && d.channel.title) || cand.title;
@@ -426,10 +437,10 @@
       var body = { ids: ids, timestamps: false }; if (USE_MOCK) body.mock = true;
       var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (r.status === 429) {
-        var d0 = await r.json().catch(function(){return{};});
+        var d0 = await safeJson(r);
         if (retries < 4) { await sleep(((d0.retryAfter || 10)) * 1000); return pullBatch(ids, group, retries + 1); }
       }
-      var d = await r.json();
+      var d = await safeJson(r);
       if (!r.ok) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr(errMsg(d, r.status)); return false; }
       var byId = {};
       (d.transcripts || []).forEach(function (t) { byId[t.videoId] = t; });
@@ -486,7 +497,7 @@
       try {
         var body = { ids: ids, timestamps: true }; if (USE_MOCK) body.mock = true;
         var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        var d = await r.json();
+        var d = await safeJson(r);
         (d.transcripts || []).forEach(function (t) { if (state.transcripts[t.videoId]) state.transcripts[t.videoId].textTs = t.text; });
       } catch (e) {}
       if (k + BATCH < need.length) await sleep(GAP_MS);

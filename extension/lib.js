@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.0",
+  BUILD: "0.8.1",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -347,10 +347,28 @@ var YC = {
   async openPanel() {
     if (YC.fromPanel()) return true;
 
-    // panel may already be open but showing the Timeline tab
+    // Panel may already be open — either showing the Timeline tab, or still loading
+    // its rows (the legacy `ytd-transcript-search-panel-renderer` variant can spend
+    // several seconds on a spinner before `ytd-transcript-segment-renderer` rows
+    // exist at all; confirmed live 2026-08 on a video with the panel already
+    // EXPANDED but zero segment elements). Give it the SAME wait budget as the
+    // click-and-wait path below, then stop: there is no "Show transcript" button to
+    // find while the panel is already showing, so falling through to hunt for one
+    // (the old behavior) always failed and threw away everything already waited.
     if (YC.visibleTranscriptPanel()) {
       await YC.selectTranscriptChip();
-      for (let i = 0; i < 12; i++) { await YC.sleep(300); if (YC.fromPanel()) return true; }
+      for (let i = 0; i < 30; i++) {
+        await YC.sleep(320);
+        if (YC.fromPanel()) return true;
+        if (i === 8 || i === 18) await YC.selectTranscriptChip();
+        // Nudge the lazy-load: some panel variants only fetch their rows once the
+        // loading placeholder actually intersects the viewport.
+        const cont = document.querySelector(
+          "ytd-engagement-panel-section-list-renderer:not([visibility*='HIDDEN']) ytd-continuation-item-renderer"
+        );
+        if (cont) cont.scrollIntoView({ block: "nearest" });
+      }
+      return !!YC.fromPanel();
     }
 
     // The button lives inside the (collapsed) description, so expand that first.
