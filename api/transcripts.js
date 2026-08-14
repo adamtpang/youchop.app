@@ -326,13 +326,27 @@ async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock })
   let lastError = null;
   const attempted = [];
   for (const name of chain) {
+    const isLast = name === chain[chain.length - 1];
     try {
       const result = await PROVIDERS[name](list, withTs, debug, preferredLang);
       if (!result.error) {
-        result.provider = name;
-        if (attempted.length) result.fellBackFrom = attempted;
-        await enrichTitles(result.transcripts);
-        return { ok: true, ...result };
+        // A provider can answer with no top-level error yet every single video
+        // still failed (e.g. Supadata returning a per-video 429, which is not
+        // classified as a hard error). Treating that as "this provider succeeded"
+        // stranded every later provider in the chain unreachable, confirmed live
+        // 2026-08: transcriptapi never got a chance to run because Supadata's
+        // all-fail batch looked identical to a real success. Fall through instead,
+        // unless this is the last provider, since there is nothing left to try.
+        const anyOk = (result.transcripts || []).some((t) => t.ok);
+        if (anyOk || isLast) {
+          result.provider = name;
+          if (attempted.length) result.fellBackFrom = attempted;
+          await enrichTitles(result.transcripts);
+          return { ok: true, ...result };
+        }
+        lastError = { status: 502, body: { error: "empty_batch", provider: name, detail: (result.transcripts || []).map((t) => t.reason).filter(Boolean) } };
+        attempted.push(name);
+        continue;
       }
       lastError = result.error;
       attempted.push(name);
