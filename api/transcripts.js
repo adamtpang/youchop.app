@@ -1,17 +1,22 @@
 // POST /api/transcripts  { ids: [videoId,...], timestamps?, mock?, debug? }
 // Pluggable transcript backends with automatic fallback:
-//   TRANSCRIPT_PROVIDER = "apify" | "supadata" | "ytio"  forces one provider;
-//   otherwise every configured provider is tried in order apify -> supadata -> ytio
-//   (a provider that errors, e.g. monthly credits exhausted, falls through to the next).
-//   - apify:    APIFY_TOKEN (free $5/mo credits). Actor runs on Apify's infra, which
-//               survives YouTube's datacenter-IP blocking that kills scraping on Vercel.
-//               Actor: karamelo/youtube-transcripts (override APIFY_TRANSCRIPT_ACTOR).
-//               Verified output shape: { videoId, captions, channelName? } where captions
-//               is a string (singleStringText), [{start,end,text}] (textWithTimestamps),
-//               or [string] (captions).
-//   - supadata: SUPADATA_API_KEY (free 100 transcripts/mo, no card). One request per video:
-//               GET api.supadata.ai/v1/transcript?url=…  (x-api-key header).
-//   - ytio:     YT_TRANSCRIPT_TOKEN, youtube-transcript.io (paid, optional).
+//   TRANSCRIPT_PROVIDER = "apify" | "supadata" | "transcriptapi" | "ytio"  forces one;
+//   otherwise every configured provider is tried in order apify -> supadata ->
+//   transcriptapi -> ytio (a provider that errors, e.g. monthly credits exhausted,
+//   falls through to the next).
+//   - apify:         APIFY_TOKEN (free $5/mo credits). Actor runs on Apify's infra,
+//               which survives YouTube's datacenter-IP blocking that kills scraping
+//               on Vercel. Actor: karamelo/youtube-transcripts (override
+//               APIFY_TRANSCRIPT_ACTOR). Verified output shape: { videoId, captions,
+//               channelName? } where captions is a string (singleStringText),
+//               [{start,end,text}] (textWithTimestamps), or [string] (captions).
+//   - supadata:      SUPADATA_API_KEY (free 100 transcripts/mo, no card). One request
+//               per video: GET api.supadata.ai/v1/transcript?url=… (x-api-key header).
+//   - transcriptapi: TRANSCRIPTAPI_KEY, transcriptapi.com (free 100 credits, no card,
+//               then $5/mo). GET transcriptapi.com/api/v2/youtube/transcript?video_url=…
+//               (Authorization: Bearer). Standard REST error codes: 402 = out of
+//               credits, 429/408 = retryable.
+//   - ytio:          YT_TRANSCRIPT_TOKEN, youtube-transcript.io (paid, optional).
 // Batches capped at 50 ids. Mock mode needs no key.
 
 const YTIO_BASE = "https://www.youtube-transcript.io/api";
@@ -178,6 +183,56 @@ async function viaSupadata(ids, withTs, debug, lang) {
   return { transcripts: ids.map((id) => byId[id] || { videoId: id, title: "", author: "", ok: false, text: "" }) };
 }
 
+/* ---------- provider: transcriptapi.com (free 100 credits, no card, then $5/mo) ---------- */
+function normalizeTranscriptApi(id, data, withTs) {
+  const segs = (data && data.transcript) || [];
+  const text = segs.map((s) => {
+    const t = String(s.text || "").replace(/\s+/g, " ").trim();
+    return withTs ? "[" + hms(s.start || 0) + "] " + t : t;
+  }).filter(Boolean).join(withTs ? "\n" : " ");
+  return {
+    videoId: id, title: (data && data.title) || "", author: (data && data.author_name) || "",
+    language: (data && data.language) || "", ok: !!text, text,
+  };
+}
+async function viaTranscriptApi(ids, withTs, debug, lang) {
+  const key = process.env.TRANSCRIPTAPI_KEY;
+  if (!key) return { error: { status: 500, body: { error: "no_transcriptapi_key", message: "Server is missing TRANSCRIPTAPI_KEY (free 100-credit tier, no card)." } } };
+  const results = [];
+  let hardError = null;
+  const CONC = 4;
+  const fetchOne = async (id) => {
+    const qs = "video_url=" + encodeURIComponent(id) + "&format=json&include_timestamp=true&send_metadata=true"
+      + (lang ? "&language=" + encodeURIComponent(lang + ",asr") : "");
+    // AbortSignal timeout is a backstop, same reasoning as viaApify: never let one
+    // slow/stuck provider call eat the whole request's 60s budget.
+    return fetch("https://transcriptapi.com/api/v2/youtube/transcript?" + qs, {
+      headers: { Authorization: "Bearer " + key }, signal: AbortSignal.timeout(15000),
+    });
+  };
+  for (let i = 0; i < ids.length && !hardError; i += CONC) {
+    const group = ids.slice(i, i + CONC);
+    const settled = await Promise.all(group.map(async (id) => {
+      let r;
+      try { r = await fetchOne(id); }
+      catch (e) { return { videoId: id, title: "", author: "", ok: false, text: "", reason: (e && e.name === "TimeoutError") ? "timed out" : String(e.message || e) }; }
+      if (r.status === 401 || r.status === 402) { hardError = { status: r.status, body: { error: "transcriptapi_error", status: r.status } }; return null; }
+      // 408/429 are documented as retryable; one retry after their stated backoff window.
+      if (r.status === 408 || r.status === 429) {
+        await new Promise((z) => setTimeout(z, 2200));
+        try { r = await fetchOne(id); } catch { /* keep the original response for the reason below */ }
+      }
+      const data = await r.json().catch(() => null);
+      if (!r.ok) return { videoId: id, title: "", author: "", ok: false, text: "", reason: (data && data.detail) || `provider HTTP ${r.status}` };
+      return normalizeTranscriptApi(id, data, withTs);
+    }));
+    settled.forEach((x) => { if (x) results.push(x); });
+  }
+  if (hardError && !results.some((t) => t.ok)) return { error: hardError };
+  const byId = {}; results.forEach((t) => { byId[t.videoId] = t; });
+  return { transcripts: ids.map((id) => byId[id] || { videoId: id, title: "", author: "", ok: false, text: "" }) };
+}
+
 /* ---------- title/author enrichment via YouTube oEmbed (free, no key) ---------- */
 async function enrichTitles(transcripts) {
   const missing = transcripts.filter((t) => t.ok && !t.title);
@@ -239,13 +294,14 @@ function mock(ids, withTs) {
   }));
 }
 
-const PROVIDERS = { apify: viaApify, supadata: viaSupadata, ytio: viaYtio };
+const PROVIDERS = { apify: viaApify, supadata: viaSupadata, transcriptapi: viaTranscriptApi, ytio: viaYtio };
 function providerChain() {
   const forced = (process.env.TRANSCRIPT_PROVIDER || "").toLowerCase();
   if (forced && PROVIDERS[forced]) return [forced];
   const chain = [];
   if (process.env.APIFY_TOKEN) chain.push("apify");
   if (process.env.SUPADATA_API_KEY) chain.push("supadata");
+  if (process.env.TRANSCRIPTAPI_KEY) chain.push("transcriptapi");
   if (process.env.YT_TRANSCRIPT_TOKEN) chain.push("ytio");
   return chain;
 }
