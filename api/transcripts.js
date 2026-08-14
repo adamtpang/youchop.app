@@ -79,14 +79,30 @@ function normalizeApify(items, ids, withTs) {
 async function viaApify(ids, withTs, debug) {
   const token = process.env.APIFY_TOKEN;
   if (!token) return { error: { status: 500, body: { error: "no_apify_token", message: "Server is missing APIFY_TOKEN (free Apify tier)." } } };
-  const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}`;
+  // `timeout` (seconds) tells Apify's own platform to stop waiting and respond,
+  // rather than holding the sync connection open indefinitely. Confirmed live
+  // 2026-08: with the account over its monthly limit the actor never starts, but
+  // run-sync-get-dataset-items still hung 30s+ on a SINGLE video instead of
+  // failing fast, which occasionally pushed the whole request past Vercel's 60s
+  // maxDuration into a bare FUNCTION_INVOCATION_TIMEOUT. The client-side
+  // AbortSignal is a backstop in case Apify does not honor the query param.
+  const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}&timeout=15`;
   const input = {
     urls: ids.map((id) => "https://www.youtube.com/watch?v=" + id),
     outputFormat: withTs ? "textWithTimestamps" : "singleStringText",
     channelNameBoolean: true,
     maxRetries: 6,
   };
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  let r;
+  try {
+    r = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+      signal: AbortSignal.timeout(18000),
+    });
+  } catch (e) {
+    const timedOut = e && (e.name === "TimeoutError" || e.name === "AbortError");
+    return { error: { status: 504, body: { error: "apify_error", status: 504, detail: timedOut ? "apify did not respond in time" : String(e.message || e) } } };
+  }
   const data = await r.json().catch(() => null);
   if (!r.ok) {
     const msg = data && (data.error && data.error.message || data.message) || "";

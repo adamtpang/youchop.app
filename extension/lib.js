@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.1",
+  BUILD: "0.8.2",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -399,11 +399,14 @@ var YC = {
       return document.querySelector("ytd-video-description-transcript-section-renderer button");
     };
 
+    // The description section can still be hydrating, especially right after a
+    // YouTube SPA navigation (the extension can run before the new page's
+    // description has rendered at all). One 900ms retry wasn't always enough
+    // (confirmed live 2026-08 on a video where the button existed but the
+    // extension's diagnostic showed the panel never opened); poll longer instead
+    // of giving up after a single check.
     let btn = findBtn();
-    if (!btn) {                      // description may still be rendering
-      await YC.sleep(900);
-      btn = findBtn();
-    }
+    for (let i = 0; i < 6 && !btn; i++) { await YC.sleep(500); btn = findBtn(); }
     if (!btn) return false;
 
     btn.click();
