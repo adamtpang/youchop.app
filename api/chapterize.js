@@ -11,7 +11,11 @@
 
 const { fetchTranscripts, parseVideoId, hms } = require("./transcripts");
 
-const MODEL = process.env.CHAPTERIZE_MODEL || "claude-3-5-haiku-latest";
+// "claude-3-5-haiku-latest" (Claude 3.5-era) was the previous default; current
+// lineup is Claude 5 / Haiku 4.5, updated 2026-08 alongside fixing the invalid
+// ANTHROPIC_API_KEY that was silently forcing every request onto the heuristic
+// fallback engine.
+const MODEL = process.env.CHAPTERIZE_MODEL || "claude-haiku-4-5-20251001";
 const MAX_TRANSCRIPT_CHARS = 120_000;
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
