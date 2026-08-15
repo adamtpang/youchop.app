@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.3",
+  BUILD: "0.8.4",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -483,12 +483,17 @@ var YC = {
   /* Real chapters (creator-added via description timestamps, or YouTube's own
      auto-chapters) render as an engagement panel whose target-id contains
      "macro-markers" (confirmed live 2026-08, several videos, while debugging the
-     transcript panel elsewhere in this file), plus the chapter markers YouTube
-     draws directly on the seekbar. Either signal alone is enough. */
+     transcript panel elsewhere in this file).
+     NOT a signal: .ytp-chapters-container / .ytp-chapter-hover-container. Despite
+     the name, that's just the seekbar's generic progress-bar/hover scaffolding,
+     rendered on every video whether it has chapters or not (confirmed live
+     2026-08 on a video with zero chapters, in this same file, on the exact video
+     used to test hasChapters() itself: it always exists with one child). Using it
+     made hasChapters() return true universally, hiding the "Make chapters" button
+     on every video, which is what actually got noticed and reported. */
   hasChapters() {
     if (document.querySelector('ytd-engagement-panel-section-list-renderer[target-id*="macro-markers"]')) return true;
     if (document.querySelector("ytd-macro-markers-list-item-renderer")) return true;
-    if (document.querySelector(".ytp-chapter-hover-container, .ytp-chapters-container")) return true;
     return false;
   },
 
