@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.2",
+  BUILD: "0.8.3",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -478,6 +478,35 @@ var YC = {
       return { t: sec, text: (m[4] || "").trim() };
     }).filter((r) => r.text);
     return { rows, title: t.title || "", author: t.author || "" };
+  },
+
+  /* Real chapters (creator-added via description timestamps, or YouTube's own
+     auto-chapters) render as an engagement panel whose target-id contains
+     "macro-markers" (confirmed live 2026-08, several videos, while debugging the
+     transcript panel elsewhere in this file), plus the chapter markers YouTube
+     draws directly on the seekbar. Either signal alone is enough. */
+  hasChapters() {
+    if (document.querySelector('ytd-engagement-panel-section-list-renderer[target-id*="macro-markers"]')) return true;
+    if (document.querySelector("ytd-macro-markers-list-item-renderer")) return true;
+    if (document.querySelector(".ytp-chapter-hover-container, .ytp-chapters-container")) return true;
+    return false;
+  },
+
+  /* Ask youchop.app to turn this video's transcript into paste-ready chapters.
+     Only meaningful when hasChapters() is false; the endpoint itself re-checks
+     server-side and refuses (cheaply, before spending transcript quota) if the
+     video already has real chapters, so this stays correct even if the DOM
+     signal above was wrong or stale. */
+  async fetchChapters(videoId) {
+    const r = await fetch("https://youchop.app/api/chapterize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: videoId }),
+    });
+    const d = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((d && (d.message || d.error)) || `chapterize HTTP ${r.status}`);
+    if (!d) throw new Error("empty response from chapterize");
+    return d;
   },
 
   /* Tries, in order: YouTube's open transcript panel (free, local, most reliable),

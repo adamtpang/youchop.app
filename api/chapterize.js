@@ -13,6 +13,30 @@ const { fetchTranscripts, parseVideoId, hms } = require("./transcripts");
 
 const MODEL = process.env.CHAPTERIZE_MODEL || "claude-3-5-haiku-latest";
 const MAX_TRANSCRIPT_CHARS = 120_000;
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/124.0.0.0 Safari/537.36";
+
+// Real chapters (creator-added via description timestamps, or YouTube's own
+// auto-chapters) render as an engagement panel whose target-id contains
+// "macro-markers" — confirmed live 2026-08 across several videos while debugging
+// the extension's transcript panel in this same session. That panel is
+// server-rendered into the watch page's own HTML, so a plain fetch (no headless
+// browser) sees it, same trick channel-videos.js already uses for channel pages.
+// Checked BEFORE spending any transcript-provider quota, so a video that already
+// has chapters never burns a request against the free tiers for nothing.
+async function hasExistingChapters(videoId) {
+  try {
+    const r = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: { "user-agent": UA, "accept-language": "en-US,en;q=0.9" },
+    });
+    if (!r.ok) return null; // unknown; do not block generation on a lookup failure
+    const html = await r.text();
+    return /engagement-panel-macro-markers/i.test(html);
+  } catch {
+    return null; // unknown; same reasoning
+  }
+}
 
 async function readJson(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -229,6 +253,20 @@ module.exports = async (req, res) => {
 
   if (!videoId && !wantMock) {
     return res.status(400).json({ error: "missing_video", message: "Provide url or id (YouTube video)." });
+  }
+
+  // 0) Skip videos that already have real chapters, unless explicitly overridden.
+  // Checked first so it never spends transcript-provider quota on a video we're
+  // not going to generate anything for.
+  if (!wantMock && videoId && !body.force) {
+    const already = await hasExistingChapters(videoId);
+    if (already) {
+      return res.status(200).json({
+        videoId,
+        alreadyHasChapters: true,
+        message: "This video already has chapters (creator-added or YouTube auto-chapters). Pass force:true to generate anyway.",
+      });
+    }
   }
 
   // 1) Transcript with timestamps

@@ -44,6 +44,7 @@
           <button data-f="markdown">Markdown</button>
         </div>
         <div class="yc-actions">
+          <button class="yc-btn amber" id="yc-chapters" style="display:none">Make chapters for comment</button>
           <button class="yc-btn ghost" id="yc-download">Download</button>
           <button class="yc-btn red" id="yc-copy">Copy</button>
         </div>
@@ -118,6 +119,44 @@
         URL.revokeObjectURL(a.href);
         toast("Downloaded.");
       };
+
+      // Offer chapter generation only when this video doesn't already have real
+      // ones, matching GROWTH.md's comment loop: viewer-pasted chapters only add
+      // value on videos the creator hasn't chaptered themselves.
+      const chBtn = $("#yc-chapters", el);
+      if (chBtn && !YC.hasChapters()) {
+        chBtn.style.display = "";
+        chBtn.onclick = async () => {
+          chBtn.disabled = true;
+          const original = chBtn.textContent;
+          chBtn.textContent = "Generating…";
+          try {
+            const d = await YC.fetchChapters(id);
+            if (d.alreadyHasChapters) {
+              toast("This video already has chapters.");
+              chBtn.style.display = "none";
+            } else if (d.pasteWithCredit) {
+              try { await navigator.clipboard.writeText(d.pasteWithCredit); }
+              catch { /* clipboard blocked; the text is still in d.pasteWithCredit if this ever needs a fallback UI */ }
+              toast(`Copied ${d.chapters.length} chapters. Paste as a comment.`);
+              chBtn.textContent = "Copy again";
+              chBtn.disabled = false;
+              chBtn.onclick = async () => {
+                try { await navigator.clipboard.writeText(d.pasteWithCredit); toast("Copied."); }
+                catch { toast("Clipboard blocked."); }
+              };
+            } else {
+              toast("Could not generate chapters.");
+              chBtn.textContent = original;
+              chBtn.disabled = false;
+            }
+          } catch (e) {
+            toast(String((e && e.message) || e).slice(0, 80));
+            chBtn.textContent = original;
+            chBtn.disabled = false;
+          }
+        };
+      }
     } catch (err) {
       // put the full diagnostic in the textarea so it can be read and copied,
       // rather than truncating it into the one-line footer
