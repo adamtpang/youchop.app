@@ -255,19 +255,12 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "missing_video", message: "Provide url or id (YouTube video)." });
   }
 
-  // 0) Skip videos that already have real chapters, unless explicitly overridden.
-  // Checked first so it never spends transcript-provider quota on a video we're
-  // not going to generate anything for.
-  if (!wantMock && videoId && !body.force) {
-    const already = await hasExistingChapters(videoId);
-    if (already) {
-      return res.status(200).json({
-        videoId,
-        alreadyHasChapters: true,
-        message: "This video already has chapters (creator-added or YouTube auto-chapters). Pass force:true to generate anyway.",
-      });
-    }
-  }
+  // 0) Whether the video already has chapters is informational only, never
+  // blocking, a user may want their own or better chapters even when some
+  // already exist (their own words: "I should be able to chapterize even if a
+  // video has one"). Run it alongside the transcript fetch rather than before
+  // it, so reporting this costs no extra latency on the critical path.
+  const existingCheck = (!wantMock && videoId) ? hasExistingChapters(videoId) : Promise.resolve(null);
 
   // 1) Transcript with timestamps
   const tx = await fetchTranscripts({
@@ -276,6 +269,7 @@ module.exports = async (req, res) => {
     mock: wantMock,
     lang: body.lang,
   });
+  const alreadyHasChapters = !!(await existingCheck);
   if (!tx.ok) return res.status(tx.status || 502).json(tx.body || { error: "transcript_failed" });
 
   const t = (tx.transcripts || [])[0];
@@ -347,6 +341,9 @@ module.exports = async (req, res) => {
     title: t.title || "",
     author: t.author || "",
     language: t.language || "",
+    // Informational, not blocking: the video may already have chapters (its own
+    // or YouTube's auto-chapters), generate a set anyway if asked to.
+    alreadyHasChapters,
     chapters: chapters.map((c) => ({
       start: c.start,
       timestamp: c.start === 0 ? "0:00" : hms(c.start),

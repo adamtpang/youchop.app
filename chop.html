@@ -165,7 +165,7 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  async function run(force) {
+  async function run() {
     clearErr();
     var url = $("url-input").value.trim();
     if (!url) return showErr("Paste a YouTube link or 11-character video ID.");
@@ -173,11 +173,10 @@
     $("chop-btn").disabled = true;
     $("out-panel").classList.remove("show");
     try {
-      var body = { url: url }; if (force) body.force = true;
       var r = await fetch("/api/chapterize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ url: url }),
       });
       var d = await r.json().catch(function () { return {}; });
       if (!r.ok) {
@@ -187,12 +186,10 @@
         if (d.error === "missing_video") msg = "That doesn't look like a YouTube link.";
         return showErr(msg, d.detail ? String(d.detail).slice(0, 160) : "");
       }
+      // Informational only: still render whatever was generated. The video
+      // having chapters already doesn't mean these ones aren't wanted too.
       if (d.alreadyHasChapters) {
-        showNote("This video already has chapters (creator-added or YouTube auto-chapters). " +
-          '<a href="#" id="gen-anyway" style="color:var(--amber)">Generate anyway</a>');
-        var a = document.getElementById("gen-anyway");
-        if (a) a.onclick = function (e) { e.preventDefault(); run(true); };
-        return;
+        showNote("Heads up: this video already has chapters (creator-added or YouTube auto-chapters). These are a separate, generated set.");
       }
       last = d;
       render(d);

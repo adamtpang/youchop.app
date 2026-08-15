@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.4",
+  BUILD: "0.8.5",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =

@@ -120,22 +120,22 @@
         toast("Downloaded.");
       };
 
-      // Offer chapter generation only when this video doesn't already have real
-      // ones, matching GROWTH.md's comment loop: viewer-pasted chapters only add
-      // value on videos the creator hasn't chaptered themselves.
+      // Always offer chapter generation, even on a video that already has
+      // chapters ("I should be able to chapterize even if a video has one" —
+      // the existing ones might be low quality, auto-generated, or just not as
+      // good as what this produces). YC.hasChapters() only adjusts the label,
+      // it no longer gates visibility.
       const chBtn = $("#yc-chapters", el);
-      if (chBtn && !YC.hasChapters()) {
+      if (chBtn) {
         chBtn.style.display = "";
+        chBtn.textContent = YC.hasChapters() ? "Make my own chapters" : "Make chapters for comment";
         chBtn.onclick = async () => {
           chBtn.disabled = true;
           const original = chBtn.textContent;
           chBtn.textContent = "Generating…";
           try {
             const d = await YC.fetchChapters(id);
-            if (d.alreadyHasChapters) {
-              toast("This video already has chapters.");
-              chBtn.style.display = "none";
-            } else if (d.pasteWithCredit) {
+            if (d.pasteWithCredit) {
               try { await navigator.clipboard.writeText(d.pasteWithCredit); }
               catch { /* clipboard blocked; the text is still in d.pasteWithCredit if this ever needs a fallback UI */ }
               toast(`Copied ${d.chapters.length} chapters. Paste as a comment.`);
