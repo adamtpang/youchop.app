@@ -4,8 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>YouChop: AI Chapters &amp; Timestamps for YouTube</title>
-<meta name="description" content="Give any YouTube video chapters, instantly. YouChop reads the transcript and adds real, clickable chapters to the seekbar, in YouTube's own player. Free to start. Creators: chapter your entire back-catalog for $99." />
-<meta name="keywords" content="add chapters to youtube video, youtube chapters extension, youtube timestamps generator, auto generate youtube chapters, chapterize youtube video, youtube chapter generator chrome extension, youtube key moments seo" />
+<meta name="description" content="YouChop reads a YouTube video's captions and adds real, clickable chapters to the seekbar. Free to try; creators get a $99 back-catalog pack." />
 <link rel="canonical" href="https://youchop.app/" />
 <meta property="og:title" content="YouChop: AI Chapters &amp; Timestamps for YouTube" />
 <meta property="og:description" content="Real, clickable chapters in YouTube's own player, on any video the creator never chaptered. Free to start, no card." />
@@ -21,16 +20,36 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "YouChop",
-  "applicationCategory": "BrowserApplication",
-  "operatingSystem": "Chrome",
-  "description": "AI-generated chapters and timestamps for any YouTube video, rendered in YouTube's native player UI.",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "url": "https://youchop.app"
-}
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://youchop.app/#organization",
+    "name": "YouChop",
+    "url": "https://youchop.app/",
+    "logo": "https://youchop.app/extension/icons/icon128.png",
+    "description": "YouChop is a Chrome extension that reads a YouTube video's transcript and renders real, clickable AI chapters in YouTube's own player, plus a paid service that chapterizes a creator's whole back-catalog.",
+    "sameAs": ["https://adampang.com", "https://adam.gives"]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://youchop.app/#website",
+    "name": "YouChop",
+    "url": "https://youchop.app/",
+    "publisher": { "@id": "https://youchop.app/#organization" },
+    "creator": { "@id": "https://youchop.app/#organization" },
+    "mainEntity": {
+      "@type": "SoftwareApplication",
+      "name": "YouChop",
+      "applicationCategory": "BrowserApplication",
+      "operatingSystem": "Chrome",
+      "description": "AI-generated chapters and timestamps for any YouTube video, rendered in YouTube's native player UI.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "url": "https://youchop.app/"
+    }
+  }
+]
 </script>
 </head>
 <body>
