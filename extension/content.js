@@ -76,11 +76,19 @@
 
     const fill = $("#yc-prog-fill", el);
     const plabel = $("#yc-prog-label", el);
+    // The bar must never go backwards. Each path reports within its own band, but
+    // a retry inside a wait loop can re-report a slightly lower fraction, and a bar
+    // that slides back reads as "something broke" even when it is fine.
+    let shownFrac = 0;
     const onProgress = (frac, count, eta, stage) => {
-      fill.style.width = Math.round(Math.max(0.02, frac) * 100) + "%";
-      const pct = Math.round(frac * 100);
+      shownFrac = Math.max(shownFrac, Math.max(0.02, frac));
+      fill.style.width = Math.round(shownFrac * 100) + "%";
+      const pct = Math.round(shownFrac * 100);
       const etaTxt = eta == null ? "" : eta > 0 ? ` · about ${eta}s left` : " · almost done";
-      plabel.textContent = `${stage}... ${pct}%${count ? ` · ${count.toLocaleString()} lines` : ""}${etaTxt}`;
+      // Steps already carry their own detail (a counter, a parenthetical), so only
+      // add the trailing ellipsis to a bare stage name.
+      const label = /[)\d.]$/.test(stage) ? stage : stage + "…";
+      plabel.textContent = `${pct}% · ${label}${count ? ` · ${count.toLocaleString()} lines` : ""}${etaTxt}`;
     };
 
     try {

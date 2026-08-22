@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.7",
+  BUILD: "0.8.8",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -397,8 +397,17 @@ var YC = {
     return true;
   },
 
-  async openPanel() {
-    if (YC.fromPanel()) return true;
+  /* `report(frac, message)` is optional, frac 0..1 across the opening phase only.
+     Opening the panel is the slowest, most failure-prone part of a chop and used
+     to be a silent ~10-20s dead zone: the caller announced "opening transcript"
+     at 0% once, then the polling loops below ran with nothing to show, so the bar
+     looked frozen exactly when the user most wants to know something is happening.
+     Every wait loop here now ticks, and every step says what it is doing. */
+  async openPanel(report = null) {
+    const say = (f, m) => { if (report) report(Math.max(0, Math.min(1, f)), m); };
+
+    say(0.02, "checking for an open transcript");
+    if (YC.fromPanel()) { say(1, "transcript already open"); return true; }
 
     // Panel may already be open — either showing the Timeline tab, or still loading
     // its rows (the legacy `ytd-transcript-search-panel-renderer` variant can spend
@@ -409,11 +418,17 @@ var YC = {
     // find while the panel is already showing, so falling through to hunt for one
     // (the old behavior) always failed and threw away everything already waited.
     if (YC.expandedTranscriptPanel()) {
+      say(0.06, "transcript panel is open, selecting the Transcript tab");
       await YC.selectTranscriptChip();
       for (let i = 0; i < 30; i++) {
         await YC.sleep(320);
-        if (YC.fromPanel()) return true;
-        if (i === 8 || i === 18) await YC.selectTranscriptChip();
+        if (YC.fromPanel()) { say(1, "lines are in"); return true; }
+        if (i === 8 || i === 18) {
+          say(0.1 + (i / 30) * 0.85, "still empty, re-selecting the Transcript tab");
+          await YC.selectTranscriptChip();
+        } else {
+          say(0.1 + (i / 30) * 0.85, `waiting for YouTube to load the lines (${i + 1}/30)`);
+        }
         // Nudge the lazy-load: some panel variants only fetch their rows once the
         // loading placeholder actually intersects the viewport.
         const cont = document.querySelector(
@@ -425,6 +440,7 @@ var YC = {
     }
 
     // The button lives inside the (collapsed) description, so expand that first.
+    say(0.08, "expanding the description");
     for (const sel of ["#description-inline-expander #expand", "tp-yt-paper-button#expand",
                        "#expand", "#description #expand"]) {
       const e = document.querySelector(sel);
@@ -458,18 +474,29 @@ var YC = {
     // (confirmed live 2026-08 on a video where the button existed but the
     // extension's diagnostic showed the panel never opened); poll longer instead
     // of giving up after a single check.
+    say(0.12, "looking for the Show transcript button");
     let btn = findBtn();
-    for (let i = 0; i < 6 && !btn; i++) { await YC.sleep(500); btn = findBtn(); }
-    if (!btn) return false;
+    for (let i = 0; i < 6 && !btn; i++) {
+      say(0.12 + (i / 6) * 0.1, `waiting for the description to render (${i + 1}/6)`);
+      await YC.sleep(500);
+      btn = findBtn();
+    }
+    if (!btn) { say(1, "no Show transcript button on this video"); return false; }
 
+    say(0.24, "clicking Show transcript");
     btn.click();
     await YC.sleep(900);
     // the panel can open on the Timeline tab, so select Transcript before waiting
     await YC.selectTranscriptChip();
     for (let i = 0; i < 25; i++) {
       await YC.sleep(320);
-      if (YC.fromPanel()) return true;
-      if (i === 8) await YC.selectTranscriptChip();   // retry once as it renders
+      if (YC.fromPanel()) { say(1, "lines are in"); return true; }
+      if (i === 8) {
+        say(0.28 + (i / 25) * 0.68, "still empty, re-selecting the Transcript tab");
+        await YC.selectTranscriptChip();   // retry once as it renders
+      } else {
+        say(0.28 + (i / 25) * 0.68, `waiting for YouTube to load the lines (${i + 1}/25)`);
+      }
     }
     return !!YC.fromPanel();
   },
@@ -496,9 +523,14 @@ var YC = {
       const maxT = seen.size ? Math.max(...seen.keys()) : 0;
       if (duration && maxT >= duration - 12) break;      // reached the end
       if (onProgress) {
-        const frac = duration ? Math.min(0.99, maxT / duration) : 0;
+        // Position in the video is the honest measure of progress, but a live or
+        // still-loading player can report duration 0, which used to pin frac at 0
+        // and freeze the bar for the whole harvest. Fall back to scroll passes so
+        // it still visibly advances, capped low so it cannot pretend to be nearly
+        // done when we genuinely do not know how much is left.
+        const frac = duration ? Math.min(0.99, maxT / duration) : Math.min(0.9, i / 60);
         const elapsed = (Date.now() - started) / 1000;
-        const eta = frac > 0.04 ? Math.max(0, Math.round(elapsed / frac - elapsed)) : null;
+        const eta = duration && frac > 0.04 ? Math.max(0, Math.round(elapsed / frac - elapsed)) : null;
         onProgress(frac, seen.size, eta);
       }
       if (!scroller) break;
@@ -577,10 +609,14 @@ var YC = {
     // Preferred path: YouTube's own transcript panel. Free, local, and it is the
     // one path confirmed working, because YouTube fetched the data itself with
     // valid tokens and we only read the rendered DOM.
+    // The three paths get their own slice of the bar, so a chop that falls through
+    // to a later path keeps moving forward instead of jumping back to a lower
+    // percentage: opening 0-25%, reading rows 25-100%, and the two fallbacks
+    // filling the same band when the panel path yields nothing.
     if (onProgress) onProgress(0, 0, null, "opening transcript");
-    if (await YC.openPanel()) {
+    if (await YC.openPanel(onProgress ? (f, m) => onProgress(f * 0.25, 0, null, m) : null)) {
       segs = await YC.harvestPanel(
-        onProgress ? (f, n, eta) => onProgress(f, n, eta, "reading transcript") : null
+        onProgress ? (f, n, eta) => onProgress(0.25 + f * 0.75, n, eta, "reading transcript") : null
       );
       if (segs?.length) {
         source = "panel";
@@ -593,22 +629,29 @@ var YC = {
     }
 
     if (!segs?.length) {
-      if (onProgress) onProgress(0.3, 0, null, "reading captions");
+      const p = (f, m) => { if (onProgress) onProgress(f, 0, null, m); };
+      p(0.3, "panel gave nothing, trying captions directly");
       try {
+        p(0.34, "fetching the video page");
         const pr = await YC.playerResponse(videoId);
         meta = YC.meta(pr);
+        p(0.42, "looking for a caption track");
         const track = YC.pickTrack(pr, lang);
-        if (!track) { YC.lastCaptionNote = "video has no caption tracks"; }
+        if (!track) { YC.lastCaptionNote = "video has no caption tracks"; p(0.5, "no caption track on this video"); }
         else {
+          p(0.46, `downloading ${track.languageCode || lang} captions${track.kind === "asr" ? " (auto-generated)" : ""}`);
           const s = await YC.fetchTrack(track);
-          if (s.length) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; }
-          else YC.lastCaptionNote = "endpoint returned empty (PoToken bot-gate)";
+          if (s.length) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; p(0.58, `got ${s.length} lines`); }
+          else { YC.lastCaptionNote = "endpoint returned empty (PoToken bot-gate)"; p(0.5, "YouTube returned an empty caption file"); }
         }
-      } catch (e) { YC.lastCaptionNote = String(e.message || e).slice(0, 60); }
+      } catch (e) {
+        YC.lastCaptionNote = String(e.message || e).slice(0, 60);
+        p(0.5, "caption fetch failed");
+      }
     }
 
     if (!segs) {
-      if (onProgress) onProgress(0.6, 0, null, "asking youchop.app");
+      if (onProgress) onProgress(0.6, 0, null, "asking youchop.app (last resort)");
       try {
         const api = await YC.fromApi(videoId, lang);
         segs = api.rows; source = "youchop.app";
