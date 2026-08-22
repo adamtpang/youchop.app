@@ -185,9 +185,44 @@
     return b;
   }
 
+  // The channel-page counterpart. A whole back-catalogue is more work than one
+  // tab should do inline, so this hands off to youchop.app/extract with the
+  // channel prefilled rather than trying to extract in place.
+  function makeChannelButton(ref) {
+    const b = document.createElement("button");
+    b.id = BTN_ID;
+    b.className = "youchop-inject";
+    b.textContent = "Chop channel";
+    b.title = "YouChop: pull this channel's transcripts on youchop.app";
+    b.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(
+        "https://youchop.app/extract?channel=" + encodeURIComponent("https://www.youtube.com/" + ref),
+        "_blank", "noopener"
+      );
+    };
+    return b;
+  }
+
   function inject() {
-    if (!currentVideoId()) { const b = document.getElementById(BTN_ID); if (b) b.remove(); return; }
+    const videoId = currentVideoId();
+    const channelRef = videoId ? null : YC.channelRefFrom(location.href);
+    if (!videoId && !channelRef) { const b = document.getElementById(BTN_ID); if (b) b.remove(); return; }
     if (document.getElementById(BTN_ID)) return;
+
+    if (channelRef) {
+      // The channel header's action row, where Subscribe and the ... menu live
+      const host =
+        document.querySelector("yt-flexible-actions-view-model") ||
+        document.querySelector("#channel-header-container #buttons") ||
+        document.querySelector("ytd-c4-tabbed-header-renderer #buttons") ||
+        document.querySelector("#page-header .yt-flexible-actions-view-model-wiz");
+      if (!host) return;
+      host.prepend(makeChannelButton(channelRef));
+      return;
+    }
+
     // YouTube's markup shifts; try the usual homes for the action row in order
     const host =
       document.querySelector("#top-level-buttons-computed") ||
@@ -200,8 +235,15 @@
 
   // YouTube is an SPA: watch for navigation and re-inject
   function watch() {
-    const id = currentVideoId();
-    if (id !== lastVideoId) { lastVideoId = id; closePanel(); }
+    // Track the channel too, so walking between two channels swaps the button's
+    // target instead of leaving the first channel's handle wired to it.
+    const id = currentVideoId() || YC.channelRefFrom(location.href);
+    if (id !== lastVideoId) {
+      lastVideoId = id;
+      closePanel();
+      const stale = document.getElementById(BTN_ID);
+      if (stale) stale.remove();
+    }
     inject();
   }
   document.addEventListener("yt-navigate-finish", () => setTimeout(watch, 400));

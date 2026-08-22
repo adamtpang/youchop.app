@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.5",
+  BUILD: "0.8.7",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -20,6 +20,34 @@ var YC = {
       s.match(/\/shorts\/([\w-]{11})/) ||
       s.match(/\/embed\/([\w-]{11})/);
     return m ? m[1] : null;
+  },
+
+  /* A channel page's identifying path segment, in whichever of YouTube's four
+     shapes the URL uses: "@handle", "channel/UC...", "c/Name", "user/Name".
+     Null on a watch page, search results, the homepage or anything else, so the
+     caller can tell "this is a channel" from "this is not".
+     The c/ and user/ prefixes are deliberately kept rather than reduced to the
+     bare name: /api/channel-search resolves those two shapes exactly only when
+     it can see the prefix, and degrades to a fuzzy name search without it. */
+  channelRefFrom(url) {
+    let path;
+    // Fixed base rather than location.origin: this only ever sees youtube.com
+    // URLs, and depending on ambient page state would make it untestable.
+    try { path = new URL(String(url || ""), "https://www.youtube.com").pathname; }
+    catch { return null; }
+    const m =
+      path.match(/^\/(@[\w.-]+)/) ||
+      path.match(/^\/(channel\/UC[\w-]{22})/) ||
+      path.match(/^\/(c\/[\w.-]+)/) ||
+      path.match(/^\/(user\/[\w.-]+)/);
+    return m ? m[1] : null;
+  },
+
+  // The canonical channel URL to hand to /extract, which parses all four shapes
+  // exactly when given a full URL.
+  channelUrlFrom(url) {
+    const ref = YC.channelRefFrom(url);
+    return ref ? "https://www.youtube.com/" + ref : null;
   },
 
   clock(sec) {
@@ -324,10 +352,35 @@ var YC = {
      `engagement-panel-searchable-transcript`, and the first one in document order
      was HIDDEN. Taking querySelector's first match therefore inspected the wrong
      panel and reported "present (HIDDEN)" while the real one was expanded. */
-  visibleTranscriptPanel() {
-    const panels = [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
+  transcriptPanels() {
+    return [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
       .filter((p) => /transcript/i.test(p.getAttribute("target-id") || ""));
+  },
+
+  /* Lenient: falls back to the first transcript panel even when every one of them
+     is HIDDEN. Only safe for DIAGNOSTICS, where the goal is "name a panel to
+     report on". Never use it to decide whether the panel is open: see
+     expandedTranscriptPanel() for that. */
+  visibleTranscriptPanel() {
+    const panels = YC.transcriptPanels();
     return panels.find((p) => !/HIDDEN/i.test(p.getAttribute("visibility") || "")) || panels[0] || null;
+  },
+
+  /* Strict: a transcript panel that is actually EXPANDED, or null. This is the
+     open/closed test.
+     Why it exists: openPanel() used to branch on visibleTranscriptPanel(), whose
+     `|| panels[0]` fallback returns a HIDDEN panel rather than null. On a normal
+     watch page both panels (`PAmodern_transcript_view` and
+     `engagement-panel-searchable-transcript`) are HIDDEN until the user asks for
+     one, so that check was ALWAYS truthy. openPanel therefore took the
+     "already open, just wait for rows" branch every time, burned its ~10s budget
+     waiting for rows that a hidden panel will never render, and returned false
+     without ever reaching the code that finds and clicks "Show transcript".
+     Verified live 2026-08-22: both panels HIDDEN, yet the old check returned
+     `PAmodern_transcript_view` as if the panel were open. */
+  expandedTranscriptPanel() {
+    return YC.transcriptPanels()
+      .find((p) => !/HIDDEN/i.test(p.getAttribute("visibility") || "")) || null;
   },
 
   /* The panel is tabbed: a chip bar offers "Timeline" and "Transcript", and it can
@@ -355,7 +408,7 @@ var YC = {
     // click-and-wait path below, then stop: there is no "Show transcript" button to
     // find while the panel is already showing, so falling through to hunt for one
     // (the old behavior) always failed and threw away everything already waited.
-    if (YC.visibleTranscriptPanel()) {
+    if (YC.expandedTranscriptPanel()) {
       await YC.selectTranscriptChip();
       for (let i = 0; i < 30; i++) {
         await YC.sleep(320);
