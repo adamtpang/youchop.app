@@ -648,7 +648,14 @@
     var ref = new URLSearchParams(location.search).get("channel");
     if (!ref) return;
     setMode("channel");
-    $("channel-input").value = ref;
+    var input = $("channel-input");
+    input.value = ref;
+    // Put the caret in the channel field, not the video one. Someone who
+    // arrives mid-search and wants to correct the handle should be able to
+    // type immediately, and the focus ring also makes it obvious which of the
+    // three tabs answered the link.
+    input.focus();
+    input.setSelectionRange(ref.length, ref.length);
     $("find-btn").click();
   })();
 })();
