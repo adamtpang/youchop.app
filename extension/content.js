@@ -166,6 +166,19 @@
         };
       }
     } catch (err) {
+      // Persist before rendering. The diagnostic is only in the DOM until the
+      // panel closes or YouTube client-navigates away, and a failure hit in
+      // passing is exactly the one worth having a record of later.
+      // Deliberately not awaited: a storage problem must not stop the user
+      // seeing the error, and logFailure already swallows its own.
+      YC.logFailure({
+        videoId: id,
+        title: (state.meta && state.meta.title) || document.title.replace(/ - YouTube$/, ""),
+        url: location.href,
+        message: String(err.message || err),
+        diagnostics: err.diagnostics,
+      });
+
       // put the full diagnostic in the textarea so it can be read and copied,
       // rather than truncating it into the one-line footer
       $("#yc-prog", el).style.display = "none";

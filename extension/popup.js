@@ -3,6 +3,31 @@
 (async () => {
   const msg = document.getElementById("msg");
   const go = document.getElementById("go");
+  // Render the failure log FIRST, and unconditionally. Its whole point is to be
+  // readable after the fact, which usually means after navigating away from the
+  // video that failed, so it must not sit behind the on-a-video check below.
+  await (async function renderLog() {
+    const box = document.getElementById("log");
+    const label = document.getElementById("log-msg");
+    const log = await YC.readFailures();
+    if (!log.length) return; // nothing has failed; stay out of the way
+    box.style.display = "block";
+    const last = log[log.length - 1];
+    label.textContent =
+      log.length + (log.length === 1 ? " failed chop" : " failed chops") +
+      " logged, latest " + (last.at || "").replace("T", " ").slice(0, 16) + " UTC";
+    document.getElementById("log-copy").onclick = async function () {
+      try {
+        await navigator.clipboard.writeText(YC.formatFailures(log));
+        label.textContent = "Copied " + log.length + " to the clipboard.";
+      } catch { label.textContent = "Clipboard blocked."; }
+    };
+    document.getElementById("log-clear").onclick = async function () {
+      await YC.clearFailures();
+      box.style.display = "none";
+    };
+  })();
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab?.url || "";
   const onVideo = /youtube\.com\/(watch\?|shorts\/)/.test(url);

@@ -344,6 +344,81 @@ var YC = {
     };
   },
 
+  /* ---------- failure log ----------
+     The in-panel diagnostic above is thorough but ephemeral: it is gone the moment
+     the panel closes or YouTube client-navigates, so a failure noticed in passing
+     cannot be reported afterwards. Keep the last FAILURE_LOG_CAP of them.
+
+     Each entry records the build version deliberately. This extension runs
+     unpacked and is reloaded often, and background.js exists precisely because
+     stale content scripts kept answering after a fix had landed. A log without the
+     version invites re-debugging something already fixed. */
+  FAILURE_LOG_KEY: "youchop.failures",
+  FAILURE_LOG_CAP: 50,
+
+  storage() {
+    // lib.js is also require()d by the node tests, and a content script can run
+    // where storage is unavailable. Neither should turn a transcript failure into
+    // a second, louder failure, so absence is a normal answer here, not an error.
+    try { return (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) || null; }
+    catch { return null; }
+  },
+
+  async logFailure(entry) {
+    const store = YC.storage();
+    if (!store) return null;
+    try {
+      let version = "";
+      try { version = chrome.runtime.getManifest().version; } catch {}
+      const rec = {
+        at: new Date().toISOString(),
+        version,
+        videoId: entry.videoId || "",
+        title: entry.title || "",
+        url: entry.url || "",
+        // The diagnostic block is bounded, but an unexpected error could carry a
+        // huge message and storage.local is a shared budget.
+        message: String(entry.message || "").slice(0, 4000),
+        diagnostics: entry.diagnostics || null,
+      };
+      const cur = await store.get(YC.FAILURE_LOG_KEY);
+      const log = Array.isArray(cur && cur[YC.FAILURE_LOG_KEY]) ? cur[YC.FAILURE_LOG_KEY] : [];
+      log.push(rec);
+      // keep the newest, drop the oldest
+      await store.set({ [YC.FAILURE_LOG_KEY]: log.slice(-YC.FAILURE_LOG_CAP) });
+      return rec;
+    } catch { return null; }
+  },
+
+  async readFailures() {
+    const store = YC.storage();
+    if (!store) return [];
+    try {
+      const cur = await store.get(YC.FAILURE_LOG_KEY);
+      return Array.isArray(cur && cur[YC.FAILURE_LOG_KEY]) ? cur[YC.FAILURE_LOG_KEY] : [];
+    } catch { return []; }
+  },
+
+  async clearFailures() {
+    const store = YC.storage();
+    if (!store) return;
+    try { await store.remove(YC.FAILURE_LOG_KEY); } catch {}
+  },
+
+  /* One block of plain text covering every logged failure, for pasting into a
+     bug report. */
+  formatFailures(log) {
+    if (!log || !log.length) return "No failed chops logged.";
+    return log.map(function (r, i) {
+      return [
+        "---- " + (i + 1) + "/" + log.length + "  " + r.at + "  extension v" + (r.version || "?"),
+        r.title || "(no title)",
+        r.url || r.videoId || "(no url)",
+        r.message || "(no message)",
+      ].join("\n");
+    }).join("\n\n");
+  },
+
   /* Open YouTube's transcript panel if it is not already showing, so the user
      only has to click once. Needs the description expanded first, because that is
      where the button lives. */
