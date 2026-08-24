@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.5",
+  BUILD: "0.8.8",
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
@@ -20,6 +20,34 @@ var YC = {
       s.match(/\/shorts\/([\w-]{11})/) ||
       s.match(/\/embed\/([\w-]{11})/);
     return m ? m[1] : null;
+  },
+
+  /* A channel page's identifying path segment, in whichever of YouTube's four
+     shapes the URL uses: "@handle", "channel/UC...", "c/Name", "user/Name".
+     Null on a watch page, search results, the homepage or anything else, so the
+     caller can tell "this is a channel" from "this is not".
+     The c/ and user/ prefixes are deliberately kept rather than reduced to the
+     bare name: /api/channel-search resolves those two shapes exactly only when
+     it can see the prefix, and degrades to a fuzzy name search without it. */
+  channelRefFrom(url) {
+    let path;
+    // Fixed base rather than location.origin: this only ever sees youtube.com
+    // URLs, and depending on ambient page state would make it untestable.
+    try { path = new URL(String(url || ""), "https://www.youtube.com").pathname; }
+    catch { return null; }
+    const m =
+      path.match(/^\/(@[\w.-]+)/) ||
+      path.match(/^\/(channel\/UC[\w-]{22})/) ||
+      path.match(/^\/(c\/[\w.-]+)/) ||
+      path.match(/^\/(user\/[\w.-]+)/);
+    return m ? m[1] : null;
+  },
+
+  // The canonical channel URL to hand to /extract, which parses all four shapes
+  // exactly when given a full URL.
+  channelUrlFrom(url) {
+    const ref = YC.channelRefFrom(url);
+    return ref ? "https://www.youtube.com/" + ref : null;
   },
 
   clock(sec) {
@@ -324,10 +352,35 @@ var YC = {
      `engagement-panel-searchable-transcript`, and the first one in document order
      was HIDDEN. Taking querySelector's first match therefore inspected the wrong
      panel and reported "present (HIDDEN)" while the real one was expanded. */
-  visibleTranscriptPanel() {
-    const panels = [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
+  transcriptPanels() {
+    return [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
       .filter((p) => /transcript/i.test(p.getAttribute("target-id") || ""));
+  },
+
+  /* Lenient: falls back to the first transcript panel even when every one of them
+     is HIDDEN. Only safe for DIAGNOSTICS, where the goal is "name a panel to
+     report on". Never use it to decide whether the panel is open: see
+     expandedTranscriptPanel() for that. */
+  visibleTranscriptPanel() {
+    const panels = YC.transcriptPanels();
     return panels.find((p) => !/HIDDEN/i.test(p.getAttribute("visibility") || "")) || panels[0] || null;
+  },
+
+  /* Strict: a transcript panel that is actually EXPANDED, or null. This is the
+     open/closed test.
+     Why it exists: openPanel() used to branch on visibleTranscriptPanel(), whose
+     `|| panels[0]` fallback returns a HIDDEN panel rather than null. On a normal
+     watch page both panels (`PAmodern_transcript_view` and
+     `engagement-panel-searchable-transcript`) are HIDDEN until the user asks for
+     one, so that check was ALWAYS truthy. openPanel therefore took the
+     "already open, just wait for rows" branch every time, burned its ~10s budget
+     waiting for rows that a hidden panel will never render, and returned false
+     without ever reaching the code that finds and clicks "Show transcript".
+     Verified live 2026-08-22: both panels HIDDEN, yet the old check returned
+     `PAmodern_transcript_view` as if the panel were open. */
+  expandedTranscriptPanel() {
+    return YC.transcriptPanels()
+      .find((p) => !/HIDDEN/i.test(p.getAttribute("visibility") || "")) || null;
   },
 
   /* The panel is tabbed: a chip bar offers "Timeline" and "Transcript", and it can
@@ -344,8 +397,17 @@ var YC = {
     return true;
   },
 
-  async openPanel() {
-    if (YC.fromPanel()) return true;
+  /* `report(frac, message)` is optional, frac 0..1 across the opening phase only.
+     Opening the panel is the slowest, most failure-prone part of a chop and used
+     to be a silent ~10-20s dead zone: the caller announced "opening transcript"
+     at 0% once, then the polling loops below ran with nothing to show, so the bar
+     looked frozen exactly when the user most wants to know something is happening.
+     Every wait loop here now ticks, and every step says what it is doing. */
+  async openPanel(report = null) {
+    const say = (f, m) => { if (report) report(Math.max(0, Math.min(1, f)), m); };
+
+    say(0.02, "checking for an open transcript");
+    if (YC.fromPanel()) { say(1, "transcript already open"); return true; }
 
     // Panel may already be open — either showing the Timeline tab, or still loading
     // its rows (the legacy `ytd-transcript-search-panel-renderer` variant can spend
@@ -355,12 +417,18 @@ var YC = {
     // click-and-wait path below, then stop: there is no "Show transcript" button to
     // find while the panel is already showing, so falling through to hunt for one
     // (the old behavior) always failed and threw away everything already waited.
-    if (YC.visibleTranscriptPanel()) {
+    if (YC.expandedTranscriptPanel()) {
+      say(0.06, "transcript panel is open, selecting the Transcript tab");
       await YC.selectTranscriptChip();
       for (let i = 0; i < 30; i++) {
         await YC.sleep(320);
-        if (YC.fromPanel()) return true;
-        if (i === 8 || i === 18) await YC.selectTranscriptChip();
+        if (YC.fromPanel()) { say(1, "lines are in"); return true; }
+        if (i === 8 || i === 18) {
+          say(0.1 + (i / 30) * 0.85, "still empty, re-selecting the Transcript tab");
+          await YC.selectTranscriptChip();
+        } else {
+          say(0.1 + (i / 30) * 0.85, `waiting for YouTube to load the lines (${i + 1}/30)`);
+        }
         // Nudge the lazy-load: some panel variants only fetch their rows once the
         // loading placeholder actually intersects the viewport.
         const cont = document.querySelector(
@@ -372,6 +440,7 @@ var YC = {
     }
 
     // The button lives inside the (collapsed) description, so expand that first.
+    say(0.08, "expanding the description");
     for (const sel of ["#description-inline-expander #expand", "tp-yt-paper-button#expand",
                        "#expand", "#description #expand"]) {
       const e = document.querySelector(sel);
@@ -405,18 +474,29 @@ var YC = {
     // (confirmed live 2026-08 on a video where the button existed but the
     // extension's diagnostic showed the panel never opened); poll longer instead
     // of giving up after a single check.
+    say(0.12, "looking for the Show transcript button");
     let btn = findBtn();
-    for (let i = 0; i < 6 && !btn; i++) { await YC.sleep(500); btn = findBtn(); }
-    if (!btn) return false;
+    for (let i = 0; i < 6 && !btn; i++) {
+      say(0.12 + (i / 6) * 0.1, `waiting for the description to render (${i + 1}/6)`);
+      await YC.sleep(500);
+      btn = findBtn();
+    }
+    if (!btn) { say(1, "no Show transcript button on this video"); return false; }
 
+    say(0.24, "clicking Show transcript");
     btn.click();
     await YC.sleep(900);
     // the panel can open on the Timeline tab, so select Transcript before waiting
     await YC.selectTranscriptChip();
     for (let i = 0; i < 25; i++) {
       await YC.sleep(320);
-      if (YC.fromPanel()) return true;
-      if (i === 8) await YC.selectTranscriptChip();   // retry once as it renders
+      if (YC.fromPanel()) { say(1, "lines are in"); return true; }
+      if (i === 8) {
+        say(0.28 + (i / 25) * 0.68, "still empty, re-selecting the Transcript tab");
+        await YC.selectTranscriptChip();   // retry once as it renders
+      } else {
+        say(0.28 + (i / 25) * 0.68, `waiting for YouTube to load the lines (${i + 1}/25)`);
+      }
     }
     return !!YC.fromPanel();
   },
@@ -443,9 +523,14 @@ var YC = {
       const maxT = seen.size ? Math.max(...seen.keys()) : 0;
       if (duration && maxT >= duration - 12) break;      // reached the end
       if (onProgress) {
-        const frac = duration ? Math.min(0.99, maxT / duration) : 0;
+        // Position in the video is the honest measure of progress, but a live or
+        // still-loading player can report duration 0, which used to pin frac at 0
+        // and freeze the bar for the whole harvest. Fall back to scroll passes so
+        // it still visibly advances, capped low so it cannot pretend to be nearly
+        // done when we genuinely do not know how much is left.
+        const frac = duration ? Math.min(0.99, maxT / duration) : Math.min(0.9, i / 60);
         const elapsed = (Date.now() - started) / 1000;
-        const eta = frac > 0.04 ? Math.max(0, Math.round(elapsed / frac - elapsed)) : null;
+        const eta = duration && frac > 0.04 ? Math.max(0, Math.round(elapsed / frac - elapsed)) : null;
         onProgress(frac, seen.size, eta);
       }
       if (!scroller) break;
@@ -524,10 +609,14 @@ var YC = {
     // Preferred path: YouTube's own transcript panel. Free, local, and it is the
     // one path confirmed working, because YouTube fetched the data itself with
     // valid tokens and we only read the rendered DOM.
+    // The three paths get their own slice of the bar, so a chop that falls through
+    // to a later path keeps moving forward instead of jumping back to a lower
+    // percentage: opening 0-25%, reading rows 25-100%, and the two fallbacks
+    // filling the same band when the panel path yields nothing.
     if (onProgress) onProgress(0, 0, null, "opening transcript");
-    if (await YC.openPanel()) {
+    if (await YC.openPanel(onProgress ? (f, m) => onProgress(f * 0.25, 0, null, m) : null)) {
       segs = await YC.harvestPanel(
-        onProgress ? (f, n, eta) => onProgress(f, n, eta, "reading transcript") : null
+        onProgress ? (f, n, eta) => onProgress(0.25 + f * 0.75, n, eta, "reading transcript") : null
       );
       if (segs?.length) {
         source = "panel";
@@ -540,22 +629,29 @@ var YC = {
     }
 
     if (!segs?.length) {
-      if (onProgress) onProgress(0.3, 0, null, "reading captions");
+      const p = (f, m) => { if (onProgress) onProgress(f, 0, null, m); };
+      p(0.3, "panel gave nothing, trying captions directly");
       try {
+        p(0.34, "fetching the video page");
         const pr = await YC.playerResponse(videoId);
         meta = YC.meta(pr);
+        p(0.42, "looking for a caption track");
         const track = YC.pickTrack(pr, lang);
-        if (!track) { YC.lastCaptionNote = "video has no caption tracks"; }
+        if (!track) { YC.lastCaptionNote = "video has no caption tracks"; p(0.5, "no caption track on this video"); }
         else {
+          p(0.46, `downloading ${track.languageCode || lang} captions${track.kind === "asr" ? " (auto-generated)" : ""}`);
           const s = await YC.fetchTrack(track);
-          if (s.length) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; }
-          else YC.lastCaptionNote = "endpoint returned empty (PoToken bot-gate)";
+          if (s.length) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; p(0.58, `got ${s.length} lines`); }
+          else { YC.lastCaptionNote = "endpoint returned empty (PoToken bot-gate)"; p(0.5, "YouTube returned an empty caption file"); }
         }
-      } catch (e) { YC.lastCaptionNote = String(e.message || e).slice(0, 60); }
+      } catch (e) {
+        YC.lastCaptionNote = String(e.message || e).slice(0, 60);
+        p(0.5, "caption fetch failed");
+      }
     }
 
     if (!segs) {
-      if (onProgress) onProgress(0.6, 0, null, "asking youchop.app");
+      if (onProgress) onProgress(0.6, 0, null, "asking youchop.app (last resort)");
       try {
         const api = await YC.fromApi(videoId, lang);
         segs = api.rows; source = "youchop.app";

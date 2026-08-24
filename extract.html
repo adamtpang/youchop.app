@@ -639,6 +639,25 @@
     a.download = (state.channel || "youchop").replace(/[^\w@-]+/g, "_") + "-transcripts.md";
     a.click(); URL.revokeObjectURL(a.href);
   };
+
+  // ---- prefill from ?channel= ----
+  // The extension's channel-page "Chop channel" button links here with the
+  // handle attached, so land on the right tab with the search already running
+  // instead of making someone retype what they just clicked from.
+  (function prefillFromQuery() {
+    var ref = new URLSearchParams(location.search).get("channel");
+    if (!ref) return;
+    setMode("channel");
+    var input = $("channel-input");
+    input.value = ref;
+    // Put the caret in the channel field, not the video one. Someone who
+    // arrives mid-search and wants to correct the handle should be able to
+    // type immediately, and the focus ring also makes it obvious which of the
+    // three tabs answered the link.
+    input.focus();
+    input.setSelectionRange(ref.length, ref.length);
+    $("find-btn").click();
+  })();
 })();
 </script>
 <script defer src="/_vercel/insights/script.js"></script>
