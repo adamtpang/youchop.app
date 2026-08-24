@@ -4,8 +4,11 @@
     {
       "name": "youchop",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tools/devserver.cjs"],
-      "port": 4321
+      "runtimeArgs": [
+        "tools/devserver.cjs"
+      ],
+      "port": 4325,
+      "autoPort": true
     }
   ]
 }

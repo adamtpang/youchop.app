@@ -10,7 +10,7 @@ const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascrip
                 ".json": "application/json", ".svg": "image/svg+xml", ".ico": "image/x-icon",
                 ".png": "image/png", ".txt": "text/plain" };
 
-http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true);
   let p = decodeURIComponent(u.pathname);
 
@@ -46,4 +46,10 @@ http.createServer(async (req, res) => {
   if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }
   res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
   fs.createReadStream(file).pipe(res);
-}).listen(4321, () => console.log("youchop dev server on http://localhost:4321"));
+});
+
+// 4321 is Astro's default, so a sibling Astro project (pangaea.blog) grabs it
+// first and this server then fails to bind. Default off it, and honour PORT so
+// the harness can move the server without editing code.
+const PORT = Number(process.env.PORT) || 4325;
+server.listen(PORT, () => console.log(`youchop dev server on http://localhost:${PORT}`));
