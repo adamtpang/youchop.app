@@ -12,41 +12,34 @@
 <meta property="og:url" content="https://youchop.app/extract" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <script data-posthog-fleet>(function(){if(window.__posthogFleet)return;window.__posthogFleet=1;var s=document.createElement('script');s.async=true;s.src='https://us-assets.i.posthog.com/static/array.js';s.onload=function(){if(!window.posthog||!window.posthog.init)return;window.posthog.init('phc_FCpCP9mIsb9IcxpX0Qqi6FmJ48sVvscAYIrZmtRHIq4',{api_host:'https://us.i.posthog.com',person_profiles:'identified_only',capture_pageview:'history_change',capture_pageleave:true,autocapture:false,disable_session_recording:true,disable_surveys:true,loaded:function(p){p.register({site:location.hostname})}});};document.head.appendChild(s);})();</script>
 </head>
 <body>
 
-<div class="glow" style="top:-200px; right:-100px; width:600px; height:500px; background:var(--red); opacity:.12"></div>
-<div class="glow" style="top:500px; left:-200px; width:500px; height:500px; background:var(--amber); opacity:.07"></div>
 
-<div class="wrap">
-  <nav>
-    <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
+<div class="site-header"><div class="wrap">
+  <nav aria-label="Main navigation">
+    <a class="wordmark" href="/" aria-label="YouChop home">You<span class="blade"></span>Chop</a>
     <div class="navlinks">
+      <a href="/extract" aria-current="page">Get transcript</a>
       <a href="/chop">Make chapters</a>
-      <a href="/extract" style="color:var(--ink)">Get transcript</a>
-      <a href="/creators" class="creator-link">For creators →</a>
+      <a href="/creators">For creators</a>
     </div>
   </nav>
+</div></div>
+<div class="wrap">
 
   <header class="tool-hero">
-    <div class="kicker">Get transcript</div>
-    <h1 style="font-size:clamp(36px,5.6vw,64px); font-weight:800; letter-spacing:-.035em; line-height:1.05; max-width:18ch">
-      Paste a YouTube link. Get the <span class="chopword">transcript</span>.
-    </h1>
-    <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:60ch; line-height:1.6">
-      Clean, copy-paste text for <strong style="color: var(--ink)">Claude, ChatGPT, Cursor, </strong> or any tool with a context window, one video or a selection from a channel. Caption availability varies.
-    </p>
+    <div class="kicker">YouTube transcripts</div>
+    <h1 class="tool-title">Your video, as text.</h1>
+    <p class="sub tool-sub">Paste a YouTube link to get its transcript. Read it here, copy the text, or keep a Markdown file.</p>
 
     <div class="mode-tabs">
-      <button class="mode-tab active" data-mode="single" id="tab-single">Single video</button>
-      <button class="mode-tab" data-mode="channel" id="tab-channel">Whole channel</button>
-      <button class="mode-tab" data-mode="paste" id="tab-paste">Paste a list</button>
+      <button class="mode-tab active" data-mode="single" id="tab-single" aria-pressed="true">Single video</button>
+      <button class="mode-tab" data-mode="channel" id="tab-channel" aria-pressed="false">Channel</button>
+      <button class="mode-tab" data-mode="paste" id="tab-paste" aria-pressed="false">Video list</button>
     </div>
 
     <!-- SINGLE MODE -->
@@ -109,10 +102,10 @@
           <button id="fmt-ts">Timestamps</button>
         </div>
         <button class="btn btn-ghost btn-sm" id="download-btn">Download .md</button>
-        <button class="btn btn-red btn-sm" id="copy-btn">Copy for Claude</button>
+        <button class="btn btn-red btn-sm" id="copy-btn">Copy transcript</button>
       </div>
     </div>
-    <div class="out-text" id="out-text"></div>
+    <div class="out-text" id="out-text" role="region" aria-label="Transcript" tabindex="0"></div>
     <p class="input-hint" id="ctx-note" style="margin-top:12px"></p>
   </div>
 
@@ -155,7 +148,7 @@
   <div class="wrap" style="margin-top:30px; font-family:var(--mono); font-size:11.5px">© 2026 YouChop · built by <a href="https://adampang.com">Adam Pang</a> · not affiliated with YouTube</div>
 </footer>
 
-<div class="toast" id="toast">Copied</div>
+<div class="toast" id="toast" role="status" aria-live="polite">Copied</div>
 
 <script>
 (function () {
@@ -217,6 +210,7 @@
     mode = m;
     ["single", "channel", "paste"].forEach(function (x) {
       $("tab-" + x).classList.toggle("active", m === x);
+      $("tab-" + x).setAttribute("aria-pressed", String(m === x));
       $("mode-" + x).style.display = m === x ? "" : "none";
     });
     clearErr();
@@ -525,7 +519,7 @@
       ? "⚠ ~" + tokens.toLocaleString() + " tokens, bigger than a 200K context window. Paste fewer videos, or split it."
       : "Fits comfortably in a 200K-token context window. Paste the whole thing.";
     $("out-panel").classList.add("show");
-    $("out-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("out-panel").scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
   }
 
   $("fmt-clean").onclick = function () { state.format = "clean"; $("fmt-clean").classList.add("on"); $("fmt-ts").classList.remove("on"); render(); };
@@ -609,7 +603,7 @@
         this.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + esc(h.videoId) + '?autoplay=1" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
       };
       card.querySelector('[data-act="copy"]').onclick = async function () {
-        try { await navigator.clipboard.writeText(h.text); toast("Copied, paste into Claude"); }
+        try { await navigator.clipboard.writeText(h.text); toast("Transcript copied"); }
         catch (e) { toast("Copy blocked, use View then Ctrl+C"); }
       };
       card.querySelector('[data-act="view"]').onclick = function () {
@@ -621,7 +615,7 @@
         $("stat-tokens").textContent = Number(h.tokens).toLocaleString();
         $("ctx-note").textContent = "Loaded from history (" + fmtWhen(h.when) + ").";
         $("out-panel").classList.add("show");
-        $("out-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+        $("out-panel").scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
       };
       card.querySelector('[data-act="del"]').onclick = function () {
         histWrite(histLoad().filter(function (x) { return x.id !== h.id; }));
@@ -637,7 +631,7 @@
   histRender();
 
   $("copy-btn").onclick = async function () {
-    try { await navigator.clipboard.writeText($("out-text").textContent); toast("Copied, paste into Claude"); }
+    try { await navigator.clipboard.writeText($("out-text").textContent); toast("Transcript copied"); }
     catch (e) {
       var r = document.createRange(); r.selectNode($("out-text"));
       window.getSelection().removeAllRanges(); window.getSelection().addRange(r);

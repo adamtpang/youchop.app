@@ -12,9 +12,6 @@
 <meta property="og:site_name" content="YouChop" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <script type="application/ld+json">
@@ -53,50 +50,43 @@
 </head>
 <body>
 
-<div class="glow" style="top:-200px; right:-100px; width:600px; height:500px; background:var(--red); opacity:.14"></div>
-<div class="glow" style="top:600px; left:-200px; width:500px; height:500px; background:var(--amber); opacity:.08"></div>
 
-<div class="wrap">
+<div class="site-header"><div class="wrap">
   <nav aria-label="Main navigation">
-    <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
+    <a class="wordmark" href="/" aria-label="YouChop home">You<span class="blade"></span>Chop</a>
     <div class="navlinks">
       <a href="/extract">Get transcript</a>
       <a href="/chop">Make chapters</a>
-      <a href="/creators" class="creator-link">For creators</a>
+      <a href="/creators">For creators</a>
     </div>
   </nav>
+</div></div>
+<div class="wrap">
 
   <header class="hero">
-    <div class="kicker">YouTube → usable text</div>
-    <h1>Get the <span class="chopword">transcript</span>. Keep the ideas.</h1>
-    <p class="sub">Paste a YouTube link. Get readable text you can <strong>copy, search, or download</strong> for your notes and research.</p>
-    <div class="cta-row">
-      <a class="btn btn-red" id="transcript-cta" href="/extract">Get a YouTube transcript →</a>
-      <a class="btn btn-ghost" href="/chop">Make chapters</a>
-    </div>
-    <p class="microcopy">Works in your browser · no installation or sign-up required · caption availability varies</p>
-    <p class="microcopy">The extension is in development and is not yet published in the Web Store.</p>
-    <div style="margin-top:56px" class="kicker">Extension preview: chapters inside YouTube</div>
-
-    <!-- ======= the live demo: a seekbar getting chopped ======= -->
-    <div class="player" id="demo" aria-label="Animated demo: a YouTube video gaining chapters">
-      <div class="screen">
-        <span class="vtitle">Deep dive: how container ships actually work</span>
-        <div class="playbtn"></div>
-        <span class="vlen mono">2:14:07</span>
-        <button class="chopbtn" tabindex="-1" aria-hidden="true"><span class="dot"></span>Chapterize</button>
+    <div class="hero-copy">
+      <div class="kicker">Less scrubbing. More understanding.</div>
+      <h1>Keep the words.<br><span class="hero-muted">Find the idea.</span></h1>
+      <p class="sub">Turn a YouTube video into a transcript you can read, search, and make your own notes from.</p>
+      <div class="cta-row">
+        <a class="btn btn-red" id="transcript-cta" href="/extract">Get a transcript <span aria-hidden="true">↗</span></a>
+        <a class="hero-secondary" href="/chop">Make chapters <span aria-hidden="true">→</span></a>
       </div>
-      <div class="bar-zone">
-        <div class="seekbar">
-          <div class="seg-track" id="track"></div>
-          <div class="chopline"></div>
-          <div class="playhead" id="playhead" style="left:4%"></div>
-          <div class="chapchip" id="chip"><span class="t">14:32</span><span class="n">Why ports are the bottleneck</span></div>
-        </div>
-      </div>
-      <div class="chaplist" id="chaplist"></div>
+      <p class="microcopy">No account. No extension. Just a link.</p>
     </div>
-    <p class="demo-caption">watch: <span class="stage" id="stagelabel">a 2-hour video with no chapters</span></p>
+    <div class="transcript-preview" aria-label="Interactive transcript example">
+      <div class="preview-heading"><span class="preview-mark" aria-hidden="true">≋</span><div><h2>A little clarity goes a long way.</h2><p>Example transcript · 3 passages</p></div></div>
+      <fieldset class="preview-switch"><legend class="sr-only">Example transcript format</legend>
+        <label><input type="radio" name="preview-format" value="clean" checked><span>Clean text</span></label>
+        <label><input type="radio" name="preview-format" value="timed"><span>Timestamps</span></label>
+      </fieldset>
+      <div class="preview-passages" id="preview-passages">
+        <p><span class="preview-time" hidden>0:00</span><span>Good ideas rarely arrive in a straight line. Sometimes you need to read the words to find the thread.</span></p>
+        <p><span class="preview-time" hidden>0:24</span><span>A transcript gives you room to pause. Notice a detail. Connect it to something you already know.</span></p>
+        <p><span class="preview-time" hidden>0:48</span><span>Then take the part that matters with you.</span></p>
+      </div>
+      <div class="preview-footer"><span>Illustrative sample</span><span>Ready to read <span aria-hidden="true">✓</span></span></div>
+    </div>
   </header>
 </div>
 
@@ -154,102 +144,13 @@
 
 <script>
 (function () {
-  // Reveal on scroll
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (en) { if (en.isIntersecting) en.target.classList.add("in"); });
-  }, { threshold: 0.15 });
-  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
-
-  /* ===== the demo: a seekbar getting chopped, on loop ===== */
-  var CHAPTERS = [
-    { t: "0: 00",    nm: "Cold open, a $14B traffic jam", w: 9,  len: "12: 40" },
-    { t: "12:40",   nm: "Anatomy of a container ship",    w: 17, len: "23:05" },
-    { t: "35:45",   nm: "Why ports are the bottleneck",   w: 22, len: "28:12" },
-    { t: "1:03:57", nm: "The crane operator's view",      w: 15, len: "19:48" },
-    { t: "1:23:45", nm: "Automation vs the unions",       w: 20, len: "26:30" },
-    { t: "1:50:15", nm: "What breaks next",               w: 17, len: "23:52" }
-  ];
-  var player = document.getElementById("demo");
-  var track = document.getElementById("track");
-  var list = document.getElementById("chaplist");
-  var chip = document.getElementById("chip");
-  var playhead = document.getElementById("playhead");
-  var stage = document.getElementById("stagelabel");
-  if (!player) return;
-
-  // build segments + rows
-  CHAPTERS.forEach(function (c, i) {
-    var seg = document.createElement("div");
-    seg.className = "seg"; seg.style.setProperty("--w", c.w);
-    seg.innerHTML = '<div class="fill"></div>';
-    track.appendChild(seg);
-    var row = document.createElement("div");
-    row.className = "chaprow"; row.style.transitionDelay = (i * 70) + "ms";
-    row.innerHTML = '<span class="ts">' + c.t + '</span><span class="nm">' + c.nm + '</span><span class="len">' + c.len + '</span>';
-    list.appendChild(row);
+  document.querySelectorAll('[name="preview-format"]').forEach(function (input) {
+    input.addEventListener("change", function () {
+      var timed = input.value === "timed";
+      document.querySelectorAll(".preview-time").forEach(function (time) { time.hidden = !timed; });
+      document.getElementById("preview-passages").classList.toggle("timed", timed);
+    });
   });
-  var rows = list.querySelectorAll(".chaprow");
-  var fills = track.querySelectorAll(".fill");
-
-  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  function setStage(txt) { stage.textContent = txt; }
-
-  function cycle() {
-    // phase 0: reset, one grey bar
-    player.className = "player";
-    rows.forEach(function (r) { r.classList.remove("active"); });
-    fills.forEach(function (f) { f.style.width = "0%"; });
-    chip.classList.remove("show");
-    playhead.style.left = "4%";
-    setStage("a 2-hour video with no chapters");
-
-    // phase 1: press chapterize
-    setTimeout(function () {
-      player.classList.add("pressed", "thinking");
-      setStage("reading the transcript…");
-    }, 1800);
-
-    // phase 2: chop sweep
-    setTimeout(function () {
-      player.classList.remove("pressed");
-      player.classList.add("chopping");
-    }, 3200);
-
-    // phase 3: segments split + list reveals
-    setTimeout(function () {
-      player.classList.remove("thinking", "chopping");
-      player.classList.add("chopped", "listed");
-      setStage("6 chapters, built from the transcript");
-    }, 4400);
-
-    // phase 4: "click" chapter 3, playhead jumps, chip shows
-    setTimeout(function () {
-      rows[2].classList.add("active");
-      chip.style.left = "44%";
-      chip.classList.add("show");
-      playhead.style.left = "44%";
-      player.classList.add("playing");
-      fills[2].style.transition = "width 3.5s linear";
-      fills[2].style.width = "38%";
-      setStage("jump straight to the part you came for");
-    }, 6200);
-
-    // phase 5: brief hold, then loop
-    setTimeout(function () {
-      fills[2].style.transition = "none";
-      cycle();
-    }, 11500);
-  }
-
-  if (reduced) {
-    // static final state for reduced motion
-    player.classList.add("chopped", "listed", "playing");
-    rows[2].classList.add("active");
-    playhead.style.left = "44%";
-    setStage("6 chapters, built from the transcript");
-  } else {
-    cycle();
-  }
 })();
 </script>
 </body>

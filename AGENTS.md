@@ -1,3 +1,9 @@
+## October 21, 2026: Apple-design web refinement
+
+Applied the apple-design skill to the public website: system fonts, semantic light/dark colors, quiet sticky translucent navigation, consistent active-page labels, readable transcript output, immediate pressed-state CSS, keyboard focus rings, and reduced-motion/transparency/contrast preferences. Replaced the homepage's looping unpublished-extension animation with a labeled interactive transcript sample using native radio controls. Removed external font requests and obsolete demo CSS. Transcript extraction remains the primary CTA; the original caption API behavior and known Anthropic credential blocker are unchanged.
+
+Verified isolated Helium desktop/mobile layouts, native radio arrow-key navigation, transcript result rendering, focus rings, preference fallbacks, sticky header after scroll, and individual content bounds at 320px with 200% root text sizing. 37 existing Node tests pass; inline JS syntax and diff checks pass. Evidence: exports/apple-design-2026-10-21/. No real-person usability study or installed-extension change.
+
 ## October 21, 2026: Public transcript entry and web readiness
 
 Homepage now leads to `/extract` with a prominent Get a YouTube transcript button. No extension installation or email is required; the unpublished extension is labeled as a preview. Removed unsupported credit/referral claims and stale image metadata. Navigation distinguishes transcripts from chapters. Mobile navigation, inputs, history cards and decorative glows fit 390px without horizontal overflow.

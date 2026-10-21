@@ -12,9 +12,6 @@
 <meta property="og:url" content="https://youchop.app/chop" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <style>
@@ -42,27 +39,23 @@
 </head>
 <body>
 
-<div class="glow" style="top:-180px; left:20%; width:560px; height:460px; background:var(--amber); opacity:.12"></div>
 
-<div class="wrap">
-  <nav>
-    <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
+<div class="site-header"><div class="wrap">
+  <nav aria-label="Main navigation">
+    <a class="wordmark" href="/" aria-label="YouChop home">You<span class="blade"></span>Chop</a>
     <div class="navlinks">
-      <a href="/chop" style="color:var(--ink)">Chapterize</a>
       <a href="/extract">Get transcript</a>
-      <a href="/creators" class="creator-link">For creators →</a>
+      <a href="/chop" aria-current="page">Make chapters</a>
+      <a href="/creators">For creators</a>
     </div>
   </nav>
+</div></div>
+<div class="wrap">
 
   <header class="tool-hero">
     <div class="kicker">Creator self-serve · one video</div>
-    <h1 style="font-size:clamp(36px,5.6vw,64px); font-weight:800; letter-spacing:-.035em; line-height:1.05; max-width:16ch">
-      Paste a link. Get <span class="amber">chapters</span>.
-    </h1>
-    <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:58ch; line-height:1.6">
-      Ready-to-paste description text, starts at <strong style="color:var(--ink)">0:00</strong> so Google can index
-      <strong style="color:var(--ink)">Key Moments</strong>. Same unit of work as the $99 back-catalog pack; this page does one video free.
-    </p>
+    <h1 class="tool-title">Give every idea a place.</h1>
+    <p class="sub tool-sub">Create editable chapter timestamps from a video’s transcript. Review the draft, then copy it to your description.</p>
 
     <div class="input-row" style="margin-top:28px">
       <input class="tool-input" aria-label="YouTube video URL or ID" id="url-input" placeholder="https://youtube.com/watch?v=…, after your mp4 is on YouTube" autocomplete="off" />
@@ -136,7 +129,7 @@
   <div class="wrap" style="margin-top:30px; font-family:var(--mono); font-size:11.5px">© 2026 YouChop · built by <a href="https://adampang.com">Adam Pang</a> · not affiliated with YouTube</div>
 </footer>
 
-<div class="toast" id="toast">Copied</div>
+<div class="toast" id="toast" role="status" aria-live="polite">Copied</div>
 
 <script>
 (function () {
@@ -224,7 +217,7 @@
     }).join("");
     $("paste-box").value = d.paste || "";
     $("out-panel").classList.add("show");
-    $("out-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("out-panel").scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
   }
 
   function copy(text, label) {
