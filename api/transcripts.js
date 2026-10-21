@@ -21,6 +21,7 @@
 // Vercel Runtime Cache. Batches capped at 50 ids. Mock mode needs no key.
 
 const YTIO_BASE = "https://www.youtube-transcript.io/api";
+const { decodeCaptionText } = require("./text");
 const APIFY_ACTOR = process.env.APIFY_TRANSCRIPT_ACTOR || "karamelo~youtube-transcripts";
 const {
   normalizeLanguage,
@@ -317,7 +318,9 @@ function presentTranscript(transcript, withTs) {
   if (!transcript) return transcript;
   return {
     ...transcript,
-    text: withTs ? String(transcript.text || "") : stripTimestamps(transcript.text),
+    title: decodeCaptionText(transcript.title),
+    author: decodeCaptionText(transcript.author),
+    text: decodeCaptionText(withTs ? String(transcript.text || "") : stripTimestamps(transcript.text)),
   };
 }
 

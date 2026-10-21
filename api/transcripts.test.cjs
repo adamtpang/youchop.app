@@ -38,7 +38,7 @@ test("shared cache serves clean and timestamped variants after one provider extr
         json: async () => ({
           lang: "en",
           content: [
-            { offset: 0, text: "Opening idea" },
+            { offset: 0, text: "I&#39;m opening &amp; learning" },
             { offset: 65_000, text: "Second idea" },
           ],
         }),
@@ -58,7 +58,7 @@ test("shared cache serves clean and timestamped variants after one provider extr
     });
     assert.equal(first.ok, true);
     assert.equal(first.provider, "supadata");
-    assert.equal(first.transcripts[0].text, "Opening idea Second idea");
+    assert.equal(first.transcripts[0].text, "I'm opening & learning Second idea");
     assert.deepEqual(first.cache, {
       layer: "vercel-runtime",
       ttlDays: 30,
@@ -68,7 +68,7 @@ test("shared cache serves clean and timestamped variants after one provider extr
     });
     assert.equal(cache.writes.length, 1);
     assert.equal(cache.writes[0].options.ttl, 30 * 24 * 60 * 60);
-    assert.match(cache.writes[0].value.text, /^\[0:00\] Opening idea\n\[1:05\] Second idea$/);
+    assert.match(cache.writes[0].value.text, /^\[0:00\] I&#39;m opening &amp; learning\n\[1:05\] Second idea$/);
 
     delete process.env.TRANSCRIPT_PROVIDER;
     delete process.env.SUPADATA_API_KEY;
@@ -83,7 +83,7 @@ test("shared cache serves clean and timestamped variants after one provider extr
     assert.equal(second.provider, "cache");
     assert.equal(second.cache.hits, 1);
     assert.equal(second.cache.misses, 0);
-    assert.match(second.transcripts[0].text, /^\[0:00\] Opening idea\n\[1:05\] Second idea$/);
+    assert.match(second.transcripts[0].text, /^\[0:00\] I'm opening & learning\n\[1:05\] Second idea$/);
     assert.equal(providerCalls, 1);
   } finally {
     global.fetch = previousFetch;

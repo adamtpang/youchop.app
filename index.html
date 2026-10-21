@@ -3,20 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>YouChop: AI Chapters &amp; Timestamps for YouTube</title>
-<meta name="description" content="YouChop reads a YouTube video's captions and adds real, clickable chapters to the seekbar. Free to try; creators get a $99 back-catalog pack." />
+<title>YouChop: YouTube transcripts &amp; chapters</title>
+<meta name="description" content="Paste a YouTube link and get its transcript. Copy clean text, download Markdown, or create editable chapters. Use the web tools without installing an extension." />
 <link rel="canonical" href="https://youchop.app/" />
-<meta property="og:title" content="YouChop: AI Chapters &amp; Timestamps for YouTube" />
-<meta property="og:description" content="Real, clickable chapters in YouTube's own player, on any video the creator never chaptered. Free to start, no card." />
+<meta property="og:title" content="YouChop: YouTube transcripts &amp; chapters" />
+<meta property="og:description" content="YouTube transcripts, ready to copy or download. Open the web tool and paste a link." />
 <meta property="og:url" content="https://youchop.app" />
 <meta property="og:site_name" content="YouChop" />
 <meta property="og:type" content="website" />
-<meta property="og:image" content="https://youchop.app/og-image.png" />
-<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:card" content="summary" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-<link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <script type="application/ld+json">
@@ -27,8 +25,8 @@
     "@id": "https://youchop.app/#organization",
     "name": "YouChop",
     "url": "https://youchop.app/",
-    "logo": "https://youchop.app/extension/icons/icon128.png",
-    "description": "YouChop is a Chrome extension that reads a YouTube video's transcript and renders real, clickable AI chapters in YouTube's own player, plus a paid service that chapterizes a creator's whole back-catalog.",
+    "logo": "https://youchop.app/favicon.svg",
+    "description": "YouChop provides web tools to extract YouTube captions as text and create editable chapter timestamps.",
     "sameAs": ["https://adampang.com", "https://adam.gives"]
   },
   {
@@ -43,8 +41,8 @@
       "@type": "SoftwareApplication",
       "name": "YouChop",
       "applicationCategory": "BrowserApplication",
-      "operatingSystem": "Chrome",
-      "description": "AI-generated chapters and timestamps for any YouTube video, rendered in YouTube's native player UI.",
+      "operatingSystem": "Any",
+      "description": "Extract available YouTube transcripts and create editable chapter timestamps in your browser.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "url": "https://youchop.app/"
     }
@@ -59,24 +57,26 @@
 <div class="glow" style="top:600px; left:-200px; width:500px; height:500px; background:var(--amber); opacity:.08"></div>
 
 <div class="wrap">
-  <nav>
+  <nav aria-label="Main navigation">
     <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
     <div class="navlinks">
-      <a href="/chop">Chapterize</a>
-      <a href="/extract">Channel → Text</a>
-      <a href="#pricing">Pricing</a>
-      <a href="/creators" class="creator-link">For creators →</a>
+      <a href="/extract">Get transcript</a>
+      <a href="/chop">Make chapters</a>
+      <a href="/creators" class="creator-link">For creators</a>
     </div>
   </nav>
 
   <header class="hero">
-    <h1>Give any YouTube video <span class="chopword">chapters</span>. Instantly.</h1>
-    <p class="sub">YouChop reads the transcript and adds <strong>real, clickable chapters to the seekbar</strong>, right in YouTube's own player, on any video the creator never chaptered. Free to start, no card.</p>
+    <div class="kicker">YouTube → usable text</div>
+    <h1>Get the <span class="chopword">transcript</span>. Keep the ideas.</h1>
+    <p class="sub">Paste a YouTube link. Get readable text you can <strong>copy, search, or download</strong> for your notes and research.</p>
     <div class="cta-row">
-      <a class="btn btn-red" id="install-cta" href="#install">Add to Chrome; it's free</a>
-      <a class="creator-hint" href="/chop">Or chapterize one video in the browser →</a>
+      <a class="btn btn-red" id="transcript-cta" href="/extract">Get a YouTube transcript →</a>
+      <a class="btn btn-ghost" href="/chop">Make chapters</a>
     </div>
-    <p class="microcopy">5 free chops · no credit card · works on any video with captions · <a href="/creators" style="color:inherit">creators: $99 pack</a></p>
+    <p class="microcopy">Works in your browser · no installation or sign-up required · caption availability varies</p>
+    <p class="microcopy">The extension is in development and is not yet published in the Web Store.</p>
+    <div style="margin-top:56px" class="kicker">Extension preview: chapters inside YouTube</div>
 
     <!-- ======= the live demo: a seekbar getting chopped ======= -->
     <div class="player" id="demo" aria-label="Animated demo: a YouTube video gaining chapters">
@@ -100,134 +100,39 @@
   </header>
 </div>
 
-<div class="problem">
-  <div class="wrap">
-    <p class="reveal">Most long videos never get chapters. So you <span class="scrub">scrub blind</span> through a 2-hour podcast looking for the one part you came for.</p>
-  </div>
-</div>
-
 <div class="wrap">
   <section id="how">
     <div class="kicker">How it works</div>
-    <h2 class="reveal">Three clicks between you and a navigable video.</h2>
+    <h2>From a video link to text you can use.</h2>
     <div class="steps">
-      <div class="step reveal">
-        <div class="num">1</div>
-        <h3>Open any long video</h3>
-        <p>No chapters? <strong>YouChop's icon lights up.</strong> It only wakes on videos that need it.</p>
-      </div>
-      <div class="step reveal">
-        <div class="num">2</div>
-        <h3>Click “Chapterize”</h3>
-        <p>AI reads the transcript and builds <strong>topic chapters in seconds</strong>, titles that say what's actually in each part.</p>
-      </div>
-      <div class="step reveal">
-        <div class="num">3</div>
-        <h3>Jump anywhere</h3>
-        <p>Chapters appear <strong>exactly where YouTube shows real ones</strong>, the seekbar and the chapter list. Click and skip.</p>
-      </div>
+      <div class="step"><div class="num">1</div><h3>Paste a YouTube link</h3><p>Open <a href="/extract">Get transcript</a> and paste the video URL. Single video is selected by default.</p></div>
+      <div class="step"><div class="num">2</div><h3>Read the transcript</h3><p>YouChop retrieves available captions. Choose clean text or request timestamps when the source supplies them.</p></div>
+      <div class="step"><div class="num">3</div><h3>Copy or download</h3><p>Copy the result to your notes or AI tool, or keep a Markdown file. Recent extractions are saved in this browser.</p></div>
     </div>
   </section>
-
-  <section id="native">
-    <div class="kicker">Why it feels native</div>
-    <h2 class="reveal">Not a sidebar. Not a summary panel.</h2>
+  <section id="tools">
+    <div class="kicker">Two web tools</div>
+    <h2>The words, or a way through them.</h2>
     <div class="native-grid">
-      <div class="native-card them reveal">
-        <span class="tag">Every other AI tool</span>
-        <h3>A panel next to the video</h3>
-        <p>Summarizers bolt a sidebar onto the page and hand you a wall of text. You read <em>about</em> the video instead of navigating it.</p>
-      </div>
-      <div class="native-card us reveal">
-        <span class="tag">YouChop</span>
-        <h3>Chapters in YouTube's own UI</h3>
-        <p>Seekbar segments, the chapter list, hover titles, rendered where YouTube renders real chapters, so it feels like the creator added them. And any video someone already chopped <strong style="color: var(--ink)">loads instantly, free, for everyone.</strong></p>
-      </div>
+      <div class="native-card"><h3>Get transcripts</h3><p>Extract one video, paste a list, or browse a channel. Available transcripts become readable text with source links.</p><p style="margin-top:20px"><a class="btn btn-red" href="/extract">Get transcript →</a></p></div>
+      <div class="native-card"><h3>Make chapters</h3><p>Turn a transcript into editable chapter timestamps for a video without existing chapters. Review the draft and copy it into your description yourself.</p><p style="margin-top:20px"><a class="btn btn-ghost" href="/chop">Make chapters →</a></p></div>
     </div>
   </section>
-
-  <section id="creators-band">
-    <div class="creator-band reveal">
-      <div>
-        <h3>Creator with a back-catalog full of unchaptered videos?</h3>
-        <p>Chapters pasted into your descriptions become Google-searchable <span class="price">Key Moments</span>. We'll chapter your entire back-catalog, up to 200 videos, for <span class="price">$99, once</span>. Others charge $19–39 <em>every month</em>.</p>
-      </div>
-      <a class="btn btn-amber" href="/creators">See creator pricing →</a>
-    </div>
-  </section>
-
-  <section id="extract-band">
-    <div class="creator-band reveal" style="background:linear-gradient(120deg, var(--red-dim), transparent 60%), var(--panel); border-color:#3a1f1a">
-      <div>
-        <h3>Or feed a whole channel to your AI.</h3>
-        <p>New: point YouChop at any YouTube channel, pull <span class="red">every transcript</span>, and copy-paste it straight into Claude, ChatGPT, or Cursor. Research a creator's entire catalog in one shot.</p>
-      </div>
-      <a class="btn btn-red" href="/extract">Try Channel → Text →</a>
-    </div>
-  </section>
-
-  <section id="pricing">
-    <div class="kicker">Pricing</div>
-    <h2 class="reveal">Free to start. Fair forever.</h2>
-    <p class="lede">5 free chops when you sign up, no card. Earn more by sharing, or buy a pack when you're hooked. Already-chopped videos never cost anyone a credit.</p>
-    <div class="price-grid">
-      <div class="price-card reveal">
-        <h3>What a chop costs</h3>
-        <div class="credit-row"><span>Short video <span class="muted">(under 15 min)</span></span><span class="cost">1 credit</span></div>
-        <div class="credit-row"><span>Medium <span class="muted">(15–60 min)</span></span><span class="cost">2 credits</span></div>
-        <div class="credit-row"><span>Long <span class="muted">(over an hour)</span></span><span class="cost">3 credits</span></div>
-        <div class="credit-row"><span>Already-chopped video</span><span class="earn">free · instant</span></div>
-      </div>
-      <div class="price-card reveal">
-        <h3>How you earn them</h3>
-        <div class="credit-row"><span>Sign up</span><span class="earn">+5</span></div>
-        <div class="credit-row"><span>Share chapters <span class="muted">(copy the timestamps)</span></span><span class="earn">+1</span></div>
-        <div class="credit-row"><span>Invite a friend</span><span class="earn">+10</span></div>
-        <div class="free-note"><strong>Sharing helps everyone: </strong> paste the timestamps into the comments yourself (YouChop never auto-posts anything), or send them to the creator, if they add them to the description, the whole world gets chapters.</div>
-      </div>
-    </div>
-  </section>
-
   <section id="faq">
-    <div class="kicker">FAQ</div>
-    <h2 class="reveal">The questions worth asking.</h2>
-    <div class="faq" style="margin-top:44px">
-      <details>
-        <summary>Is this against YouTube's rules?</summary>
-        <p>No. YouChop renders chapters locally in your browser, nothing is posted, automated, or modified on YouTube itself. If you choose to share timestamps in a comment, you paste them yourself, manually, like any other comment. YouChop never auto-posts anything, anywhere.</p>
-      </details>
-      <details>
-        <summary>What does the extension read?</summary>
-        <p>Only the public transcript of the video you're currently watching. No browsing history, no personal data collection, minimal permissions (youtube.com only). Our privacy policy states exactly what chapter data we store and how to request deletion.</p>
-      </details>
-      <details>
-        <summary>How does the creator back-catalog service access my videos?</summary>
-        <p>With your permission, through YouTube's official API: you sign in with Google and consent to caption access for your own channel. Nothing is scraped, and you can revoke access anytime. Your chapters are delivered as editable text you paste into your descriptions: they're yours forever, even if you never use YouChop again.</p>
-      </details>
-      <details>
-        <summary>What happens when I run out of credits?</summary>
-        <p>You can earn more free (share chapters +1, invite a friend +10) or buy a pack. And any video someone has already chapterized loads instantly and never costs you a credit.</p>
-      </details>
-      <details>
-        <summary>Do the chapters appear for other people?</summary>
-        <p>Any YouChop user opening that video sees them instantly; it's already chopped and cached. Want everyone to benefit? Copy the timestamps and paste them into the comments, or send them to the creator to add to the description.</p>
-      </details>
-      <details>
-        <summary>Does it work on every video?</summary>
-        <p>It needs the video to have a transcript or captions, which almost all long-form YouTube videos do. Rare videos without any captions can't be chapterized, we'll tell you before spending a credit.</p>
-      </details>
+    <div class="kicker">Good to know</div>
+    <h2>Before you paste a link.</h2>
+    <div class="faq" style="margin-top:32px">
+      <details><summary>Do I need the extension?</summary><p>No. Transcript extraction and chapter generation work on this website. The extension is still in development and is not yet published in the Web Store.</p></details>
+      <details><summary>Does every video have a transcript?</summary><p>No. Captions may be unavailable, restricted, or temporarily inaccessible through our transcript provider. YouChop reports failures; a missing result does not necessarily mean YouTube has no captions. Automatic captions can contain mistakes.</p></details>
+      <details><summary>Are transcripts and chapters the same thing?</summary><p>A transcript contains the video's spoken words as captions. Chapters are a shorter list of timestamps and titles. The chapter tool labels basic drafts when AI generation is unavailable so you can review them before use.</p></details>
+      <details><summary>Where does my transcript go?</summary><p>The web tool sends the video ID to our server and transcript providers. Recent extractions are saved locally in this browser and can be cleared from History. Copying or downloading gives you a local copy; YouChop does not post it to YouTube.</p></details>
+      <details><summary>Can I extract a whole channel?</summary><p>The transcript tool includes channel and list modes. Coverage depends on available captions and provider limits; some videos may be missing. Use source links to check the original videos.</p></details>
     </div>
   </section>
-</div>
-
-<div class="wrap">
-  <section class="final" id="install">
-    <h2 class="reveal">That video you're avoiding because it's 2 hours with no chapters? Fix it now.</h2>
-    <div class="cta-row">
-      <a class="btn btn-red" id="install-cta-2" href="#install">Add to Chrome; it's free</a>
-    </div>
-    <p class="microcopy">5 free chops · no credit card</p>
-    <p class="microcopy" style="margin-top:6px">Creator with a back-catalog? <a href="/creators" style="color:var(--amber)">→ /creators</a></p>
+  <section class="final">
+    <h2>Start with one video.</h2>
+    <div class="cta-row"><a class="btn btn-red" href="/extract">Get a YouTube transcript →</a></div>
+    <p class="microcopy">No extension needed.</p>
   </section>
 </div>
 
@@ -235,11 +140,11 @@
   <div class="wrap cols">
     <div>
       <a class="wordmark" href="/" style="font-size:17px">You<span class="blade" style="height:16px"></span>Chop</a>
-      <p style="margin-top:10px">Real chapters for every YouTube video.</p>
+      <p style="margin-top:10px">YouTube transcripts and editable chapters.</p>
     </div>
     <div class="flinks">
       <a href="#how">How it works</a>
-      <a href="#pricing">Pricing</a>
+      <a href="/extract">Get transcript</a>
       <a href="/creators">For creators</a>
       <a href="mailto:adamtpang@gmail.com">Contact</a>
     </div>
@@ -248,28 +153,7 @@
 </footer>
 
 <script>
-/* ===== CONFIG, swap when the Chrome Web Store listing is live ===== */
-var CHROME_STORE_URL = ""; // e.g. "https://chromewebstore.google.com/detail/youchop/<id>"
-
 (function () {
-  // Install CTA: link to store when live; honest fallback until then.
-  ["install-cta", "install-cta-2"].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    if (CHROME_STORE_URL) {
-      el.href = CHROME_STORE_URL;
-      el.target = "_blank";
-      el.rel = "noopener noreferrer";
-    } else {
-      el.addEventListener("click", function (e) {
-        e.preventDefault();
-        el.textContent = "Launching on the Web Store, email me for day-one access →";
-        el.href = "mailto:adamtpang@gmail.com?subject=YouChop%20early%20access";
-        el.onclick = null;
-      }, { once: true });
-    }
-  });
-
   // Reveal on scroll
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (en) { if (en.isIntersecting) en.target.classList.add("in"); });

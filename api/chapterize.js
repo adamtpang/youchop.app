@@ -10,6 +10,7 @@
 // Output is YouTube description-ready (must start at 0:00). Never posts to YouTube.
 
 const { fetchTranscripts, parseVideoId, hms } = require("./transcripts");
+const { decodeCaptionText } = require("./text");
 
 // "claude-3-5-haiku-latest" (Claude 3.5-era) was the previous default; current
 // lineup is Claude 5 / Haiku 4.5, updated 2026-08 alongside fixing the invalid
@@ -170,7 +171,7 @@ function timestampedText(segments) {
 }
 
 function cleanTitle(s) {
-  let t = String(s || "")
+  let t = decodeCaptionText(s)
     .replace(/[\[\]]/g, "")
     .replace(/^[\d:.\-\s]+/, "")
     .replace(/^["'“”]+|["'“”]+$/g, "")
@@ -517,6 +518,11 @@ module.exports = async (req, res) => {
     transcriptProvider: tx.provider,
     transcriptCache: tx.cache || null,
     engine,
+    warning: engine === "heuristic"
+      ? (engineMeta.note === "no_timestamps_in_transcript"
+        ? "This transcript has no usable timestamps. Only a full-video placeholder is available; this is not a chapter breakdown."
+        : "Basic chapter draft: titles come from caption phrases, not AI topic analysis. Review and edit them before use.")
+      : null,
     ...engineMeta,
   });
 };

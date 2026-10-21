@@ -1,3 +1,13 @@
+## October 21, 2026: Public transcript entry and web readiness
+
+Homepage now leads to `/extract` with a prominent Get a YouTube transcript button. No extension installation or email is required; the unpublished extension is labeled as a preview. Removed unsupported credit/referral claims and stale image metadata. Navigation distinguishes transcripts from chapters. Mobile navigation, inputs, history cards and decorative glows fit 390px without horizontal overflow.
+
+Caption entities are decoded at the API presentation boundary, including cached results. Transcript HTML/error/history rendering escapes external text. Requests have a 65-second client deadline; a 429 stops the batch without automatic retry, and unavailable timestamps preserve clean output with an explanation. Chapter output is editable and copying respects edits; basic fallback drafts have an explicit warning. 37 Node tests pass. Isolated Helium fixtures cover error recovery, literal markup, missing timestamps and edited chapter copying; live landing-to-transcript, timestamps, clipboard and Markdown download passed with jNQXAC9IVRw. Private evidence: exports/web-readiness-2026-10-21/.
+
+Production AI chapter generation is still blocked by Anthropic HTTP 401, invalid x-api-key. A synthetic canary returned three labeled heuristic chapters; this does not verify AI chapter quality. A valid production Anthropic credential is required. Do not claim the whole product is perfect. The extension remains unpublished and the personal Helium extension was not reloaded.
+
+Pending corpus work: Yusufa Sey channel for Anchor. Adam selected **United States nationwide** for accountancy-firm leads. See exports/yusufa-sey-2026-10-19/PENDING.md; requested video's local transcription completed, but full corpus reconciliation and Anchor copy/prompt are still pending.
+
 
 ## October 19, 2026: Deep transcribe modal fallback v0.14.0
 

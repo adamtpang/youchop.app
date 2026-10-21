@@ -19,7 +19,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -39,6 +39,7 @@ body::before {
 }
 .glow {
   position: absolute; pointer-events: none; filter: blur(120px); opacity: .5; z-index: 0;
+  left: 0 !important; right: 0 !important; max-width: 100%; margin-inline: auto;
 }
 
 a { color: inherit; }
@@ -469,6 +470,7 @@ textarea.tool-input { resize: vertical; min-height: 120px; line-height: 1.6; wid
 }
 .seg-toggle button.on { background: var(--red-dim); color: var(--ink); }
 .btn-sm { padding: 9px 16px; font-size: 14px; border-radius: 10px; }
+button:disabled { cursor: wait; opacity: .65; }
 .out-text {
   width: 100%; min-height: 340px; max-height: 560px; overflow-y: auto;
   background: var(--panel2); border: 1px solid var(--line); border-radius: 14px;
@@ -534,6 +536,14 @@ textarea.tool-input { resize: vertical; min-height: 120px; line-height: 1.6; wid
   .chaprow .len { display: none; }
   section { padding: 64px 0; }
   .vitem .vmeta { display: none; }
+}
+@media (max-width: 560px) {
+  nav { flex-wrap: wrap; gap: 16px; }
+  .navlinks { flex-wrap: wrap; gap: 12px 18px; font-size: 14px; }
+  .tool-input { min-width: 0; flex-basis: 100%; }
+  .hist-grid { grid-template-columns: minmax(0, 1fr); }
+  .mode-tabs { flex-wrap: wrap; }
+  .cta-row { align-items: stretch; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

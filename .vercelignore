@@ -19,3 +19,7 @@ repos.yaml
 # Repository metadata
 .git/
 .gitignore
+
+# Private agent review logs and local metadata
+.codex*
+.agents/

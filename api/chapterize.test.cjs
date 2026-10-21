@@ -152,3 +152,28 @@ test("chapterize rejects an explicitly empty local transcript", async () => {
     global.fetch = previousFetch;
   }
 });
+
+test("AI rejection returns a labeled basic draft with readable caption entities", async () => {
+  const previousFetch = global.fetch;
+  const previousKey = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  global.fetch = async (url) => String(url).startsWith("https://api.anthropic.com/")
+    ? { ok: false, status: 401, json: async () => ({ error: { message: "invalid key" } }) }
+    : { ok: true, status: 200, text: async () => "<html></html>" };
+  try {
+    const result = await invoke({ id: "abcdefghijk", segments: [
+      { t: 0, text: "I&#39;m explaining the opening idea" },
+      { t: 60, text: "A second practical lesson" },
+    ] });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.engine, "heuristic");
+    assert.equal(result.body.anthropicFallback, "anthropic_error");
+    assert.match(result.body.warning, /Basic chapter draft/);
+    assert.match(result.body.paste, /I'm explaining/);
+    assert.doesNotMatch(result.body.paste, /&#39;/);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previousKey;
+  }
+});

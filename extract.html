@@ -3,20 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>YouChop: Extract a whole YouTube channel's transcripts for your LLM</title>
-<meta name="description" content="Search any YouTube channel, pull every video's transcript, and copy-paste the whole thing into Claude, ChatGPT, or your code tool. Clean text, ready for context." />
+<title>YouChop: Get a YouTube transcript</title>
+<meta name="description" content="Paste a YouTube video link to get available captions as text. Copy the transcript or download Markdown. No extension required." />
 <meta name="keywords" content="youtube channel transcript extractor, download youtube transcripts, youtube transcript for chatgpt, feed youtube channel to claude, bulk youtube transcript export" />
 <link rel="canonical" href="https://youchop.app/extract" />
-<meta property="og:title" content="YouChop: a YouTube channel → your LLM" />
-<meta property="og:description" content="Every transcript from any channel, as clean copy-paste text for Claude, ChatGPT, or Cursor." />
+<meta property="og:title" content="YouChop: YouTube transcripts" />
+<meta property="og:description" content="Available YouTube captions as text you can copy or download." />
 <meta property="og:url" content="https://youchop.app/extract" />
 <meta property="og:type" content="website" />
-<meta property="og:image" content="https://youchop.app/og-image.png" />
-<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:card" content="summary" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-<link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="site.css" />
 <script data-posthog-fleet>(function(){if(window.__posthogFleet)return;window.__posthogFleet=1;var s=document.createElement('script');s.async=true;s.src='https://us-assets.i.posthog.com/static/array.js';s.onload=function(){if(!window.posthog||!window.posthog.init)return;window.posthog.init('phc_FCpCP9mIsb9IcxpX0Qqi6FmJ48sVvscAYIrZmtRHIq4',{api_host:'https://us.i.posthog.com',person_profiles:'identified_only',capture_pageview:'history_change',capture_pageleave:true,autocapture:false,disable_session_recording:true,disable_surveys:true,loaded:function(p){p.register({site:location.hostname})}});};document.head.appendChild(s);})();</script>
@@ -30,19 +28,19 @@
   <nav>
     <a class="wordmark" href="/">You<span class="blade"></span>Chop</a>
     <div class="navlinks">
-      <a href="/#how">Chapters</a>
-      <a href="/extract" style="color:var(--ink)">Channel → Text</a>
+      <a href="/chop">Make chapters</a>
+      <a href="/extract" style="color:var(--ink)">Get transcript</a>
       <a href="/creators" class="creator-link">For creators →</a>
     </div>
   </nav>
 
   <header class="tool-hero">
-    <div class="kicker">Channel → Text</div>
+    <div class="kicker">Get transcript</div>
     <h1 style="font-size:clamp(36px,5.6vw,64px); font-weight:800; letter-spacing:-.035em; line-height:1.05; max-width:18ch">
       Paste a YouTube link. Get the <span class="chopword">transcript</span>.
     </h1>
     <p class="sub" style="margin-top:22px; font-size:18px; color:var(--mut); max-width:60ch; line-height:1.6">
-      Clean, copy-paste text for <strong style="color: var(--ink)">Claude, ChatGPT, Cursor, </strong> or any tool with a context window, one video, or a whole channel at once. No watching, no scrubbing.
+      Clean, copy-paste text for <strong style="color: var(--ink)">Claude, ChatGPT, Cursor, </strong> or any tool with a context window, one video or a selection from a channel. Caption availability varies.
     </p>
 
     <div class="mode-tabs">
@@ -54,7 +52,7 @@
     <!-- SINGLE MODE -->
     <div id="mode-single">
       <div class="input-row">
-        <input class="tool-input" id="single-input" placeholder="https://youtube.com/watch?v=…, paste any YouTube link" autocomplete="off" />
+        <input class="tool-input" id="single-input" aria-label="YouTube video URL or ID" placeholder="https://youtube.com/watch?v=…, paste any YouTube link" autocomplete="off" />
         <button class="btn btn-red" id="single-btn">Get transcript</button>
       </div>
       <p class="input-hint">One link in, one transcript out, copy it straight into your LLM.</p>
@@ -63,7 +61,7 @@
     <!-- CHANNEL MODE -->
     <div id="mode-channel" style="display:none">
       <div class="input-row">
-        <input class="tool-input" id="channel-input" placeholder="Search by name, “Veritasium”, or paste @handle / channel / playlist URL" autocomplete="off" />
+        <input class="tool-input" id="channel-input" aria-label="Channel name or URL" placeholder="Search by name, “Veritasium”, or paste @handle / channel / playlist URL" autocomplete="off" />
         <button class="btn btn-red" id="find-btn">Search</button>
       </div>
       <p class="input-hint">Type a channel name and pick it, paste an @handle / channel URL, or paste a playlist URL to jump straight to its videos.</p>
@@ -72,14 +70,15 @@
 
     <!-- PASTE MODE -->
     <div id="mode-paste" style="display:none">
-      <textarea class="tool-input" id="paste-input" placeholder="Paste YouTube links or video IDs, one per line:&#10;https://youtube.com/watch?v=jNQXAC9IVRw&#10;https://youtu.be/dQw4w9WgXcQ&#10;kJQP7kiw5Fk"></textarea>
+      <textarea class="tool-input" id="paste-input" aria-label="YouTube video links" placeholder="Paste YouTube links or video IDs, one per line:&#10;https://youtube.com/watch?v=jNQXAC9IVRw&#10;https://youtu.be/dQw4w9WgXcQ&#10;kJQP7kiw5Fk"></textarea>
       <div class="input-row" style="margin-top:12px">
         <button class="btn btn-red" id="paste-btn">Load these videos</button>
-        <span class="input-hint" style="align-self: center; margin-top: 0">Works on any plan, no channel search needed.</span>
+        <span class="input-hint" style="align-self: center; margin-top: 0">No channel search needed.</span>
       </div>
     </div>
 
-    <div class="err-box" id="err"></div>
+    <div class="err-box" id="err" role="status" aria-live="polite"></div>
+    <p class="input-hint" id="single-status" role="status" aria-live="polite"></p>
   </header>
 
   <!-- VIDEO LIST -->
@@ -133,7 +132,7 @@
     <div class="kicker">Why</div>
     <h2 class="reveal in">Transcripts are the fastest way to put a creator's brain in your context window.</h2>
     <div class="steps" style="margin-top:44px">
-      <div class="step"><div class="num">1</div><h3>Research a whole channel</h3><p>Pull an expert's entire catalog and ask Claude to <strong>synthesize everything they've said</strong> on a topic.</p></div>
+      <div class="step"><div class="num">1</div><h3>Research a whole channel</h3><p>Collect available transcripts and ask your AI tool to <strong>compare ideas</strong> with links to the original videos.</p></div>
       <div class="step"><div class="num">2</div><h3>Ground your code tool</h3><p>Drop a tutorial series into Cursor as <strong>reference text</strong> instead of re-watching six hours.</p></div>
       <div class="step"><div class="num">3</div><h3>Keep the text</h3><p>Clean, delimited, timestamp-optional. <strong>Yours to paste anywhere</strong>, no re-fetching.</p></div>
     </div>
@@ -144,11 +143,11 @@
   <div class="wrap cols">
     <div>
       <a class="wordmark" href="/" style="font-size:17px">You<span class="blade" style="height:16px"></span>Chop</a>
-      <p style="margin-top: 10px">Real chapters, and raw transcripts, for every YouTube video.</p>
+      <p style="margin-top: 10px">YouTube transcripts and editable chapters.</p>
     </div>
     <div class="flinks">
-      <a href="/#how">Chapters</a>
-      <a href="/extract">Channel → Text</a>
+      <a href="/chop">Make chapters</a>
+      <a href="/extract">Get transcript</a>
       <a href="/creators">For creators</a>
       <a href="mailto:adamtpang@gmail.com">Contact</a>
     </div>
@@ -169,7 +168,7 @@
 
   // ---- helpers ----
   function showErr(msg, detail) {
-    var e = $("err"); e.innerHTML = msg + (detail ? ' <code>' + detail + '</code>' : "");
+    var e = $("err"); e.textContent = msg + (detail ? " " + detail : "");
     e.classList.add("show"); e.classList.remove("note");
   }
   function clearErr() { $("err").classList.remove("show"); }
@@ -185,7 +184,7 @@
     return (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(s).padStart(2, "0");
   }
   function toast(t) { var el = $("toast"); el.textContent = t; el.classList.add("show"); setTimeout(function(){ el.classList.remove("show"); }, 1400); }
-  function esc(s) { return String(s == null ? "" : s); }
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
   function q(o) { return Object.keys(o).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
 
   // A platform-level failure (timeout, 502/504) answers with a plain-text error
@@ -257,7 +256,7 @@
   $("select-none").onclick = function () { state.videos.forEach(function (v) { v.selected = false; }); renderList(); };
 
   // ---- channel search -> pick -> list ----
-  function escAttr(s) { return String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+  function escAttr(s) { return esc(s); }
   function renderChannels(cands) {
     var box = $("chan-results");
     box.innerHTML = cands.map(function (c, i) {
@@ -357,10 +356,16 @@
 
   // ---- single video:paste a link -> one transcript ----
   $("single-btn").onclick = async function () {
+    if (extracting) return;
     clearErr();
     var ids = parseVideoIds($("single-input").value);
     if (!ids.length) return showErr("Paste a valid YouTube link (or an 11-character video ID).");
     var id = ids[0];
+    setBusy(true);
+    $("single-status").textContent = "Fetching captions… This can take up to a minute.";
+    state.failReasons = {};
+    state.format = "clean";
+    $("fmt-clean").classList.add("on"); $("fmt-ts").classList.remove("on");
     $("single-btn").textContent = "Fetching…"; $("single-btn").disabled = true;
     $("videos-panel").classList.remove("show");
     $("out-panel").classList.remove("show");
@@ -372,44 +377,46 @@
     var okB = await pullBatch([id], [{ v: state.videos[0], i: 0 }]);
     $("pbar-fill").style.width = "100%";
     setTimeout(function () { $("progress").classList.remove("show"); $("pbar-fill").style.width = "0%"; }, 400);
-    $("single-btn").textContent = "Get transcript"; $("single-btn").disabled = false;
+    $("single-btn").textContent = "Get transcript"; setBusy(false);
+    $("single-status").textContent = "";
     if (state.transcripts[id]) { render(); histSave(); }
     else if (okB) {
-      // Don't assert "captions disabled" as fact: YouTube usually has captions and
-      // the third-party provider fetching them can fail on a specific video even
-      // when it works fine on others. Say what's actually known, and point at the
-      // Chrome extension, which reads YouTube's captions directly and isn't subject
-      // to this provider's per-video failures.
-      var reason = state.failReasons[id];
-      showErr(
-        "Couldn't get a transcript for that video from our provider" + (reason ? " (" + reason + ")" : "") + ".",
-        "If the video does have captions on YouTube, the YouChop Chrome extension reads them directly from the page and usually works when this doesn't."
-      );
+      showErr("We couldn't retrieve captions for this video. Check the link, try another video, or try again later. Captions may still be available on YouTube.");
     }
   };
   $("single-input").addEventListener("keydown", function (e) { if (e.key === "Enter") $("single-btn").click(); });
 
   function errMsg(d, status) {
-    var e = d && d.error;
+    var e = String((d && d.error) || "");
     if (e === "lookup_failed") return "Couldn't find that channel. Try the exact @handle, or paste the channel URL.";
     if (e === "no_data_key") return "Channel lookup is misconfigured on the server.";
     if (e === "quota_exceeded") return "YouTube Data API daily quota is used up (resets midnight Pacific). Try again tomorrow, or use Paste video links.";
     if (e === "channel_not_found" || e === "no_uploads") return "Couldn't find that channel's videos. Try the exact @handle or the channel URL.";
-    if (e === "no_apify_token" || e === "no_supadata_key" || e === "no_transcriptapi_key" || e === "no_ytio_token" || e === "no_provider") return "The transcript backend isn't configured yet, set a free key in the server env (APIFY_TOKEN, SUPADATA_API_KEY, or TRANSCRIPTAPI_KEY).";
-    if ((e === "apify_error" || e === "supadata_error" || e === "transcriptapi_error") && (status === 402 || status === 403)) return "The transcript provider's monthly credits are exhausted, add another free provider key, or wait for the reset.";
-    if (e === "rate_limited") return "Rate limited, waiting a moment and retrying automatically.";
-    if (status === 401 || status === 403) return "The API rejected the key, double-check it.";
-    return (d && (d.message || d.error)) ? ("Error: " + (d.message || d.error)) : ("Something went wrong (" + status + ").");
+    if (status === 429 || e === "rate_limited") return "Transcript requests are temporarily limited. Please try again later.";
+    if (status === 401 || status === 402 || status === 403 || e === "no_provider" || e.indexOf("no_") === 0) return "The transcript service is temporarily unavailable. Please try again later.";
+    return "Couldn't retrieve the transcript (HTTP " + status + "). Check the link or try again later.";
   }
 
   // ---- extract transcripts ----
   var extracting = false;
+  function setBusy(busy) {
+    extracting = busy;
+    ["single-btn", "find-btn", "paste-btn", "extract-btn", "tab-single", "tab-channel", "tab-paste", "fmt-clean", "fmt-ts"].forEach(function (id) { $(id).disabled = busy; });
+  }
+  async function requestTranscripts(body) {
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 65000);
+    try {
+      var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
+      return { response: r, data: await safeJson(r) };
+    } finally { clearTimeout(timeout); }
+  }
   $("extract-btn").onclick = async function () {
     if (extracting) return;
     clearErr();
     var selected = state.videos.map(function (v, i) { return { v: v, i: i }; }).filter(function (x) { return x.v.selected; });
     if (!selected.length) return showErr("Select at least one video.");
-    extracting = true; $("extract-btn").disabled = true;
+    setBusy(true);
     $("progress").classList.add("show");
     var done = 0, total = selected.length;
 
@@ -423,25 +430,20 @@
       $("pstat").textContent = "Pulling transcripts… batch " + (b + 1) + " of " + batches.length + " (" + done + "/" + total + ")";
       var ok = await pullBatch(ids, group);
       done += group.length;
+      if (!ok) break;
       $("pbar-fill").style.width = Math.round((done / total) * 100) + "%";
       if (b < batches.length - 1) await sleep(GAP_MS);
     }
-    $("pstat").textContent = "Done, " + Object.keys(state.transcripts).length + " transcripts pulled.";
-    extracting = false; $("extract-btn").disabled = false;
+    $("pstat").textContent = Object.keys(state.transcripts).length + " transcripts available from " + total + " selected videos. Missing or unattempted items remain marked in the list.";
+    setBusy(false);
     render();
     histSave();
   };
 
-  async function pullBatch(ids, group, retries) {
-    retries = retries || 0;
+  async function pullBatch(ids, group) {
     try {
       var body = { ids: ids, timestamps: false }; if (USE_MOCK) body.mock = true;
-      var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (r.status === 429) {
-        var d0 = await safeJson(r);
-        if (retries < 4) { await sleep(((d0.retryAfter || 10)) * 1000); return pullBatch(ids, group, retries + 1); }
-      }
-      var d = await safeJson(r);
+      var result = await requestTranscripts(body), r = result.response, d = result.data;
       if (!r.ok) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr(errMsg(d, r.status)); return false; }
       var byId = {};
       (d.transcripts || []).forEach(function (t) { byId[t.videoId] = t; });
@@ -459,7 +461,7 @@
         }
       });
       return true;
-    } catch (e) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr("Batch failed.", String(e.message || e)); return false; }
+    } catch (e) { group.forEach(function (x) { setState(x.i, "fail"); }); showErr(e.name === "AbortError" ? "The transcript request timed out. Please try again later." : "Could not connect to the transcript service. Check your connection and try again."); return false; }
   }
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -491,19 +493,21 @@
   // When user flips to timestamps, we need the timestamped variant. Re-fetch lazily.
   async function ensureTimestamps() {
     var need = orderedTranscripts().filter(function (t) { return !t.textTs; }).map(function (t) { return t.videoId; });
-    if (!need.length) return;
-    $("pstat").textContent = "Adding timestamps…"; $("progress").classList.add("show");
+    if (!need.length) return true;
     for (var k = 0; k < need.length; k += BATCH) {
-      var ids = need.slice(k, k + BATCH);
       try {
-        var body = { ids: ids, timestamps: true }; if (USE_MOCK) body.mock = true;
-        var r = await fetch("/api/transcripts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        var d = await safeJson(r);
-        (d.transcripts || []).forEach(function (t) { if (state.transcripts[t.videoId]) state.transcripts[t.videoId].textTs = t.text; });
-      } catch (e) {}
+        var result = await requestTranscripts({ ids: need.slice(k, k + BATCH), timestamps: true });
+        if (!result.response.ok) { showErr(errMsg(result.data, result.response.status)); return false; }
+        (result.data.transcripts || []).forEach(function (t) {
+          if (t.ok && /\[\d{1,2}:\d{2}(?::\d{2})?\]/.test(t.text || "") && state.transcripts[t.videoId]) state.transcripts[t.videoId].textTs = t.text;
+        });
+      } catch (e) { showErr("Couldn't load timestamps. Your clean transcript is still available."); return false; }
       if (k + BATCH < need.length) await sleep(GAP_MS);
     }
-    $("progress").classList.remove("show");
+    if (orderedTranscripts().some(function (t) { return !t.textTs; })) {
+      showNote("Timestamps aren't available for every selected transcript. Showing clean text instead."); return false;
+    }
+    return true;
   }
 
   function render() {
@@ -525,7 +529,14 @@
   }
 
   $("fmt-clean").onclick = function () { state.format = "clean"; $("fmt-clean").classList.add("on"); $("fmt-ts").classList.remove("on"); render(); };
-  $("fmt-ts").onclick = async function () { state.format = "ts"; $("fmt-ts").classList.add("on"); $("fmt-clean").classList.remove("on"); await ensureTimestamps(); render(); };
+  $("fmt-ts").onclick = async function () {
+    if (extracting) return;
+    clearErr(); setBusy(true); $("fmt-ts").textContent = "Loading…";
+    try {
+      var ok = await ensureTimestamps(); state.format = ok ? "ts" : "clean";
+      $("fmt-ts").classList.toggle("on", ok); $("fmt-clean").classList.toggle("on", !ok); render();
+    } finally { setBusy(false); $("fmt-ts").textContent = "Timestamps"; }
+  };
 
   /* ===== extraction history (localStorage, private to this browser) ===== */
   var HKEY = "youchop_history_v1";
@@ -630,7 +641,7 @@
     catch (e) {
       var r = document.createRange(); r.selectNode($("out-text"));
       window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
-      try { document.execCommand("copy"); toast("Copied"); } catch (e2) { toast("Press Ctrl+C"); }
+      try { if (!document.execCommand("copy")) throw new Error("Copy blocked"); toast("Copied"); } catch (e2) { toast("Press Ctrl+C"); }
     }
   };
   $("download-btn").onclick = function () {
