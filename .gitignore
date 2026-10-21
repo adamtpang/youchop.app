@@ -6,6 +6,11 @@ node_modules/
 # vitals finances are real , keep local
 # vitals/vitals.data.js
 
+# Private transcript corpora and extraction evidence
+exports/
+__pycache__/
+*.pyc
+
 .vercel
 # Cross-agent handoff files: generated from raw AI transcripts, so they embed
 # verbatim prompts. Keep them local rather than in this public repo.

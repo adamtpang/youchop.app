@@ -1,0 +1,11 @@
+{
+  "name": "youchop-app",
+  "private": true,
+  "scripts": {
+    "test": "node --test api/*.test.cjs extension/*.test.cjs",
+    "transcribe": "node tools/transcribe-start.mjs"
+  },
+  "dependencies": {
+    "@vercel/functions": "^3.9.5"
+  }
+}

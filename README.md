@@ -11,8 +11,9 @@
 | Path | What |
 |---|---|
 | `index.html` + `site.css` | Landing page (static, no build). Hero contains a CSS/JS animated demo of the seekbar getting chopped. |
-| `chop.html` + `api/chapterize.js` | **Creator self-serve:** paste one YouTube URL → ready-to-paste description chapters. Transcript via Supadata/Apify; titles via Anthropic (if valid key) or free heuristic. |
-| `extract.html` + `api/` | **Channel → Text** tool: search any channel, pull every video's transcript as copy-paste LLM context. Three Vercel functions, `channel-search.js` + `channel-videos.js` (free **YouTube Data API v3**, `YT_DATA_API_KEY`) and `transcripts.js` (pluggable: **Apify** free tier `APIFY_TOKEN` by default, `youtube-transcript.io` as paid fallback). All keys are free; see `.env.example`. Runs in mock mode without any key. |
+| `extension/` | **Local video and playlist chopping:** extracts through YouTube in the user's browser and exports clean text, timestamps, or one linked Markdown file per video. Playlist runs process up to 50 public or signed-in private videos in temporary inactive tabs. |
+| `chop.html` + `api/chapterize.js` | **Creator self-serve:** paste one YouTube URL → ready-to-paste description chapters. Web requests use Supadata/Apify; extension requests reuse local timestamp rows. Titles use Anthropic when enabled or the free heuristic. |
+| `extract.html` + `api/` | **Channel or playlist → Text** tool: search a channel or paste a public playlist, then pull transcripts as copy-paste LLM context. Listing uses keyless YouTube pages with an optional Data API fallback; hosted transcript providers remain available to the web tool. |
 | `creators.html` | The revenue surface: $99 back-catalog pack, $12/mo continuity sub, agency SKU, free-sample mechanic (links to `/chop`). |
 | `vitals/` | The company operating dashboard (vendored from [vitals.run](https://vitals.run)). `vitals.data.js` is the single source of truth for metrics, roadmap, decisions. |
 | `vercel.json` | Clean URLs (`/creators`, `/chop`), deployed to the existing `youchop.app` Vercel project. |
@@ -22,7 +23,7 @@
 **This is a rebuild.** The original Next.js app + extension source lived in `adamtpang/youchop.app` on GitHub, which was deleted; only the Vercel deployment survived (source unrecoverable for git deploys). Check [github.com/settings/deleted_repositories](https://github.com/settings/deleted_repositories), if the repo is still restorable, the extension source comes back with it.
 
 - **Self-serve chapterize is live** at `/chop`, the post-upload path for Adam's essay videos and the free creator sample.
-- Extension: built historically, **never published** to the Chrome Web Store; source lost pending repo restore (else rebuild). Do not block creator revenue on it.
+- Extension: rebuilt locally and **not yet published** to the Chrome Web Store. v0.11.0 supports one-video and public/private playlist transcript extraction plus chapter generation from locally extracted rows. Successful browser transcripts are saved on-device for 90 days, so repeat video and playlist chops can skip extraction. Provider-fetched public transcripts are cached by video and language for 30 days in Vercel Runtime Cache once this version is deployed. Failures and browser-local/private transcript text are not added to the shared cache. Playlist results expose one independently selectable, copyable, and downloadable Markdown file per video. Playlist pages receive a visible **Chop playlist** button, the chapterize button appears only on videos without existing chapters, generation covers the full transcript without a 20-chapter ceiling, and attributed output includes `https://youchop.app`.
 - Business model: **creator-revenue-first**. Presell the $99 pack with manual fulfillment; `/chop` is the proof unit (**First Chapterize** activation metric, see `EVIDENCE.md`).
 
 ## Config swap-ins (search for these)

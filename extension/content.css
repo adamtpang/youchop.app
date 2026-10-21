@@ -14,6 +14,14 @@ button.youchop-inject {
   transition: filter .15s;
 }
 button.youchop-inject:hover { filter: brightness(1.1); }
+button.youchop-inject.youchop-floating {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  margin: 0;
+  z-index: 2147483646;
+  box-shadow: 0 3px 14px #0005;
+}
 
 #youchop-panel {
   position: fixed;
@@ -81,6 +89,23 @@ button.youchop-inject:hover { filter: brightness(1.1); }
 }
 #youchop-panel .yc-seg button.on { background: rgba(255, 73, 48, .16); color: #f2efe9; }
 #youchop-panel .yc-actions { display: flex; gap: 8px; }
+#youchop-panel .yc-docbar {
+  display: flex; align-items: center; gap: 9px; margin: 0 14px 8px;
+  padding: 9px 10px; background: #1c1c24; border: 1px solid #2a2a33;
+  border-radius: 9px;
+}
+#youchop-panel .yc-docbar label {
+  color: #8f8d96; font: 600 11px/1 "Roboto", sans-serif; flex: 0 0 auto;
+}
+#youchop-panel .yc-docbar select {
+  min-width: 0; flex: 1; background: #0f0f14; color: #f2efe9;
+  border: 1px solid #353540; border-radius: 6px; padding: 7px 8px;
+  font: 12px/1.2 "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+#youchop-panel .yc-docbar span {
+  color: #ffb43a; font: 600 11px/1 "IBM Plex Mono", ui-monospace, monospace;
+  white-space: nowrap;
+}
 #youchop-panel .yc-btn {
   border: 0; border-radius: 8px; font: 600 13px/1 "Roboto", sans-serif;
   padding: 9px 15px; cursor: pointer;
@@ -100,3 +125,24 @@ button.youchop-inject:hover { filter: brightness(1.1); }
 #youchop-panel .yc-foot {
   padding: 0 14px 12px; font-size: 11.5px; color: #ffb43a; min-height: 14px;
 }
+
+#youchop-panel .yc-queue { overflow-y: auto; padding: 0 16px 16px; min-height: 0; color: #f2efe9; }
+#youchop-panel .yc-queue p { color: #aaa7b0; font: 13px/1.5 Roboto, sans-serif; }
+#youchop-panel .yc-queue-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+#youchop-panel .yc-queue label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+#youchop-panel .yc-queue-query { grid-column: 1 / -1; }
+#youchop-panel .yc-queue input, #youchop-panel .yc-queue select { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px; border: 1px solid #45434d; border-radius: 7px; background: #1c1c24; color: #f2efe9; font: 14px Roboto, sans-serif; }
+#youchop-panel .yc-queue :focus-visible { outline: 2px solid #ffb43a; outline-offset: 2px; }
+#youchop-panel .yc-queue-actions:not([hidden]) { display: flex; flex-wrap: wrap; gap: 8px; }
+#youchop-panel .yc-queue ol { padding-left: 24px; }
+#youchop-panel .yc-queue li { padding: 10px 0; border-bottom: 1px solid #353540; font-size: 13px; }
+#youchop-panel .yc-queue li a { color: #f2efe9; text-decoration: none; display: block; margin-bottom: 7px; line-height: 1.5; }
+#youchop-panel .yc-queue li a:hover { text-decoration: underline; }
+#youchop-panel .yc-queue li span { color: #aaa7b0; margin-right: 12px; }
+
+/* Recovery is a separate wrapping row so it also fits narrow/fullscreen panels. */
+#youchop-panel .yc-deep { align-items: center; gap: 12px; padding: 12px 18px; flex-wrap: wrap; border-bottom: 1px solid #333; flex-shrink: 0; }
+#youchop-panel .yc-deep p { flex: 1 1 220px; margin: 0; font-size: 12px; line-height: 1.5; color: #c7c7c7; }
+#youchop-panel .yc-actions { flex-wrap: wrap; }
+
+#youchop-panel .yc-seg button:disabled { opacity: .4; cursor: not-allowed; }

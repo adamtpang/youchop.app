@@ -1,9 +1,9 @@
 /* lib.js, transcript extraction, shared by the content script and popup.
  *
- * The whole trick: this runs in the user's own browser on their own residential
- * IP, so YouTube serves captions normally. No API key, no proxy, no server, and
- * nothing leaves the machine. This is the path that datacenter-hosted scrapers
- * cannot take, and it is why the extension is the cheapest possible extractor.
+ * The preferred paths run in the user's own browser on their own residential
+ * IP, so YouTube serves captions normally. No API key or proxy is needed for
+ * those paths. Explicit chapter generation sends the extracted transcript to
+ * youchop.app; single-video extraction retains the hosted provider as a fallback.
  */
 
 /* `var`, not `const`, on purpose: the service worker re-runs this file inside tabs
@@ -11,15 +11,65 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.8.8",
+  BUILD: "0.14.0",
+  TRACE_CAP: 240,
+  TRANSCRIPT_CACHE_KEY: "youchop.transcripts.v1",
+  TRANSCRIPT_CACHE_TTL_MS: 90 * 24 * 60 * 60 * 1000,
+  TRANSCRIPT_CACHE_CAP: 80,
+  TRANSCRIPT_CACHE_MAX_CHARS: 7_000_000,
+  traceLog: [],
+  traceStartedAt: 0,
+
+  resetTrace(detail = null) {
+    YC.traceLog = [];
+    YC.traceStartedAt = Date.now();
+    YC.trace("extract.start", detail || {});
+  },
+
+  trace(stage, detail = "") {
+    if (!YC.traceStartedAt) YC.traceStartedAt = Date.now();
+    let text;
+    if (typeof detail === "string") text = detail;
+    else {
+      try { text = JSON.stringify(detail); }
+      catch { text = String(detail); }
+    }
+    const elapsed = String(Date.now() - YC.traceStartedAt).padStart(5, " ");
+    YC.traceLog.push(`+${elapsed}ms ${stage}${text ? ` ${text}` : ""}`);
+    if (YC.traceLog.length > YC.TRACE_CAP) YC.traceLog.splice(0, YC.traceLog.length - YC.TRACE_CAP);
+  },
+
+  formatTrace() {
+    return YC.traceLog.length ? YC.traceLog.join("\n") : "(trace empty)";
+  },
+
+  runtimeVersion() {
+    let manifest = "unavailable";
+    try { manifest = chrome.runtime.getManifest().version || manifest; } catch {}
+    return `lib=${YC.BUILD}, manifest=${manifest}`;
+  },
+
   videoIdFrom(url) {
     const s = String(url || "");
     const m =
       s.match(/[?&]v=([\w-]{11})/) ||
       s.match(/youtu\.be\/([\w-]{11})/) ||
-      s.match(/\/shorts\/([\w-]{11})/) ||
+      s.match(/\/(?:shorts|live)\/([\w-]{11})/) ||
       s.match(/\/embed\/([\w-]{11})/);
     return m ? m[1] : null;
+  },
+
+  playlistIdFrom(url) {
+    try {
+      const u = new URL(String(url || ""), "https://www.youtube.com");
+      const id = u.searchParams.get("list");
+      return id && /^[\w-]{10,}$/.test(id) ? id : null;
+    } catch { return null; }
+  },
+
+  playlistUrlFrom(url) {
+    const id = YC.playlistIdFrom(url);
+    return id ? `https://www.youtube.com/playlist?list=${id}` : null;
   },
 
   /* A channel page's identifying path segment, in whichever of YouTube's four
@@ -60,9 +110,12 @@ var YC = {
      reliable than reading window vars, because YouTube is an SPA and the in-page
      object can be stale after client-side navigation. */
   async playerResponse(videoId) {
+    YC.trace("captions.watch.request", { videoId });
     const r = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: "include" });
+    YC.trace("captions.watch.response", { status: r.status, ok: r.ok });
     if (!r.ok) throw new Error(`watch page HTTP ${r.status}`);
     const html = await r.text();
+    YC.trace("captions.watch.body", { bytes: html.length });
     // the JSON is embedded in a script tag; walk braces so we stop at the right place
     const key = "ytInitialPlayerResponse";
     const at = html.indexOf(key);
@@ -80,7 +133,13 @@ var YC = {
       else if (c === "}") { depth--; if (depth === 0) { end = i + 1; break; } }
     }
     if (end === -1) throw new Error("could not parse player response");
-    return JSON.parse(html.slice(start, end));
+    const parsed = JSON.parse(html.slice(start, end));
+    YC.trace("captions.player.parsed", {
+      bytes: end - start,
+      rootKeys: Object.keys(parsed || {}).slice(0, 16),
+      tracks: parsed?.captions?.playerCaptionsTracklistRenderer?.captionTracks?.length || 0,
+    });
+    return parsed;
   },
 
   pickTrack(pr, prefer = "en") {
@@ -100,16 +159,120 @@ var YC = {
 
   async fetchTrack(track) {
     const url = track.baseUrl + "&fmt=json3";
+    let safeEndpoint = "caption endpoint";
+    try { const u = new URL(url); safeEndpoint = u.host + u.pathname; } catch {}
+    YC.trace("captions.track.request", {
+      endpoint: safeEndpoint,
+      language: track.languageCode || "unknown",
+      kind: track.kind || "human",
+    });
     const r = await fetch(url, { credentials: "include" });
+    YC.trace("captions.track.response", { status: r.status, ok: r.ok });
     if (!r.ok) throw new Error(`caption track HTTP ${r.status}`);
-    const d = await r.json();
+    const raw = await r.text();
+    YC.trace("captions.track.body", { bytes: raw.length, nonWhitespace: raw.trim().length });
+    if (!raw.trim()) throw new Error("caption endpoint returned an empty response");
+    let d;
+    try { d = JSON.parse(raw); }
+    catch { throw new Error("caption endpoint returned invalid JSON"); }
     const segs = [];
     for (const ev of d.events || []) {
       if (ev.aAppend) continue; // rolling-caption duplicate
       const text = (ev.segs || []).map((s) => s.utf8 || "").join("").replace(/\n/g, " ").trim();
       if (text) segs.push({ t: Math.floor((ev.tStartMs || 0) / 1000), text });
     }
+    YC.trace("captions.track.parsed", { events: d.events?.length || 0, rows: segs.length });
     return segs;
+  },
+
+  /* YouTube's transcript panel is itself backed by a same-origin
+     /youtubei/v1/get_transcript request. Sometimes the panel expands but leaves a
+     continuation spinner in place forever, so no transcript DOM is ever rendered.
+     The service worker asks the page's MAIN world to make that authenticated
+     request, which guarantees normal same-origin cookie and CORS behavior.
+     This stays local and free, and avoids spending the hosted provider quota. */
+  async transcriptEndpointResponse() {
+    if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      throw new Error("extension runtime unavailable");
+    }
+    YC.trace("youtube.main_world.request", { message: "youchop-transcript-context" });
+    const d = await chrome.runtime.sendMessage({ type: "youchop-transcript-context" });
+    YC.trace("youtube.main_world.response", {
+      ok: !!d?.ok,
+      error: d?.error || "",
+      debug: d?.debug || null,
+    });
+    if (!d?.ok) throw new Error(d?.error || "transcript continuation unavailable");
+    return d;
+  },
+
+  textValue(value) {
+    if (typeof value === "string") return value.trim();
+    if (!value || typeof value !== "object") return "";
+    if (typeof value.simpleText === "string") return value.simpleText.trim();
+    if (typeof value.content === "string") return value.content.trim();
+    if (Array.isArray(value.runs)) {
+      return value.runs.map((r) => r?.text || "").join("").trim();
+    }
+    return "";
+  },
+
+  /* The endpoint has shipped two segment shapes: transcriptSegmentRenderer and
+     transcriptSegmentViewModel. Find either recursively so harmless response
+     wrappers can change without breaking extraction again. */
+  parseTranscriptResponse(data) {
+    const candidates = [];
+    const walk = (value) => {
+      if (!value || typeof value !== "object") return;
+      if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+      for (const [key, child] of Object.entries(value)) {
+        if (/^transcriptSegment(?:Renderer|ViewModel)$/i.test(key) && child && typeof child === "object") {
+          candidates.push(child);
+        } else {
+          walk(child);
+        }
+      }
+    };
+    walk(data);
+
+    const rows = [];
+    for (const seg of candidates) {
+      const stamp = YC.textValue(seg.startTimeText || seg.startTime || seg.timestampText);
+      let t = Number(seg.startMs ?? seg.startTimeMs ?? seg.startTimeMilliseconds);
+      if (!Number.isFinite(t)) t = YC.toSec(stamp);
+      else t = Math.floor(t / 1000);
+      const text = YC.textValue(seg.snippet || seg.text || seg.transcriptSnippet || seg.body);
+      if (t === null || !Number.isFinite(t) || !text || text === stamp) continue;
+      rows.push({ t, text });
+    }
+
+    const seen = new Set();
+    const result = rows
+      .sort((a, b) => a.t - b.t)
+      .filter((row) => {
+        const key = `${row.t}|${row.text}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    YC.trace("youtube.transcript.parsed", {
+      candidates: candidates.length,
+      rowsBeforeDedupe: rows.length,
+      rows: result.length,
+      rootKeys: Object.keys(data || {}).slice(0, 16),
+      firstCandidateKeys: Object.keys(candidates[0] || {}).slice(0, 20),
+    });
+    return result;
+  },
+
+  async fetchTranscriptContinuation() {
+    if (YC.lastEndpointError) throw YC.lastEndpointError;
+    const response = YC.lastEndpointResult || await YC.transcriptEndpointResponse();
+    YC.lastEndpointResult = null;
+    const rows = response.nativeRendered ? (YC.fromPanel() || []) : YC.parseTranscriptResponse(response.data);
+    if (!rows.length) throw new Error("YouTube transcript response had no segments");
+    YC.trace("youtube.transcript.success", { rows: rows.length, nativeRendered: !!response.nativeRendered });
+    return rows;
   },
 
   meta(pr) {
@@ -147,6 +310,108 @@ var YC = {
     return `# ${meta.title}\n${url}\n\n${text}\n`;
   },
 
+  safeFilename(value, fallback = "transcript") {
+    const cleaned = String(value || "")
+      .normalize("NFKC")
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
+      .replace(/\s+/g, " ")
+      .replace(/[. ]+$/g, "")
+      .trim()
+      .slice(0, 96);
+    return cleaned || fallback;
+  },
+
+  /* A playlist is a collection of documents, not one giant document. Keep every
+     successful video's transcript standalone so it has its own filename,
+     frontmatter, source URL, and copy/download target in the result panel. */
+  playlistDocuments(items, playlist, format = "markdown") {
+    const rows = items || [];
+    const width = Math.max(2, String(rows.length || 1).length);
+    const listId = playlist?.id || "";
+    const playlistTitle = playlist?.title || "YouTube playlist";
+    const playlistUrl = listId ? `https://www.youtube.com/playlist?list=${listId}` : "";
+    const yaml = (value) => String(value || "")
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/[\r\n]+/g, " ");
+
+    return rows.map((item, index) => {
+      const sourceMeta = item.meta || {};
+      const videoId = sourceMeta.videoId || item.videoId || "";
+      const title = sourceMeta.title || item.title || `Video ${index + 1}`;
+      const meta = { ...sourceMeta, videoId, title };
+      const position = index + 1;
+      let text = YC.render(item.segs || [], meta, format);
+
+      if (format === "markdown") {
+        const closingFrontmatter = text.indexOf("\n---\n", 4);
+        if (closingFrontmatter >= 0) {
+          const playlistFields =
+            `\nplaylist_title: "${yaml(playlistTitle)}"` +
+            (playlistUrl ? `\nplaylist_url: "${yaml(playlistUrl)}"` : "") +
+            `\nplaylist_position: ${position}`;
+          text = text.slice(0, closingFrontmatter) + playlistFields + text.slice(closingFrontmatter);
+        }
+      }
+
+      const prefix = String(position).padStart(width, "0");
+      const fallback = `${prefix} video-${videoId || position}`;
+      const base = YC.safeFilename(`${prefix} ${title}`, fallback);
+      return {
+        position,
+        videoId,
+        title,
+        filename: `${base}.${format === "markdown" ? "md" : "txt"}`,
+        text,
+      };
+    });
+  },
+
+  /* One durable document for an entire playlist. Each video keeps its source URL
+     and timestamp deep links, so the downloaded Markdown remains useful outside
+     YouTube and can be dropped directly into an LLM or knowledge base. */
+  renderPlaylist(items, playlist, format = "markdown", failures = []) {
+    const title = playlist?.title || "YouTube playlist";
+    const listId = playlist?.id || "";
+    const playlistUrl = listId ? `https://www.youtube.com/playlist?list=${listId}` : "";
+    const head = `# ${title}\n${playlistUrl ? `\nSource: ${playlistUrl}\n` : ""}\n`;
+    const blocks = (items || []).map((item, index) => {
+      const meta = item.meta || {};
+      const segs = item.segs || [];
+      const videoId = meta.videoId || item.videoId || "";
+      const url = videoId ? `https://www.youtube.com/watch?v=${videoId}` : "";
+      const videoTitle = meta.title || item.title || `Video ${index + 1}`;
+      let body;
+      if (format === "clean") {
+        body = segs.map((s) => s.text).join(" ").replace(/\s+/g, " ").trim();
+      } else if (format === "timestamps") {
+        body = segs.map((s) => `[${YC.clock(s.t)}] ${s.text}`).join("\n");
+      } else {
+        const paras = [];
+        let cur = null;
+        for (const s of segs) {
+          if (!cur || s.t - cur.t >= 60) {
+            if (cur) paras.push(cur);
+            cur = { t: s.t, parts: [] };
+          }
+          cur.parts.push(s.text);
+        }
+        if (cur) paras.push(cur);
+        body = paras.map((p) =>
+          `[${YC.clock(p.t)}](${url}&t=${p.t}s) ${p.parts.join(" ").replace(/\s+/g, " ").trim()}`
+        ).join("\n\n");
+      }
+      return `## ${index + 1}. ${videoTitle}\n${url}\n\n${body}`;
+    });
+    if (failures?.length) {
+      blocks.push(
+        "## Videos that could not be chopped\n\n" +
+        failures.map((f) => `- ${f.title || f.videoId}: ${f.error || "unknown error"}`).join("\n")
+      );
+    }
+    return head + blocks.join("\n\n---\n\n") + "\n";
+  },
+
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 
   videoDuration() {
@@ -167,6 +432,8 @@ var YC = {
      assumes "a row begins with a timestamp". YC.lastPanelStrategy records which
      worked, so a failure can report why instead of guessing. */
   lastPanelStrategy: null,
+  lastEndpointResult: null,
+  lastEndpointError: null,
 
   fromPanel() {
     const mk = (stamp, text) => {
@@ -233,6 +500,7 @@ var YC = {
   // player's own scrubber, and the description (which often lists chapters as
   // plain text, rendered once collapsed and again expanded).
   NOT_TRANSCRIPT: /macro-markers|ytp-chrome-bottom|ytp-modern-videowall|ytLockupViewModel|description|ytAttributedString/i,
+  NOT_TRANSCRIPT_SELECTOR: "#movie_player, ytd-macro-markers-list-item-renderer, [class*='macro-markers'], [id*='description'], [class*='ytLockupViewModel']",
 
   /* Every element in the document whose entire text is a timestamp, grouped by the
      tag+class signature of the row around it; the biggest group is the transcript.
@@ -246,6 +514,7 @@ var YC = {
       const txt = (el.textContent || "").trim();
       const m = txt.match(ONLY);
       if (!m) continue;
+      if (el.closest(YC.NOT_TRANSCRIPT_SELECTOR)) continue;
       // Climb past wrappers that add nothing, so `row` is the first ancestor that
       // holds words as well as the stamp.
       let stampEl = el, row = el.parentElement;
@@ -307,10 +576,11 @@ var YC = {
   /* How many elements contain nothing but a timestamp. This distinguishes
      "the transcript is not rendered" from "it is rendered in a layout we did not
      parse", which the previous diagnostic could not tell apart. */
-  stampOnlyCount() {
+  stampOnlyCount(includeKnownNoise = false) {
     let n = 0;
     for (const el of document.querySelectorAll("span, div, button, yt-formatted-string, a")) {
-      if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test((el.textContent || "").trim())) n++;
+      if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test((el.textContent || "").trim()) &&
+          (includeKnownNoise || !el.closest(YC.NOT_TRANSCRIPT_SELECTOR))) n++;
     }
     return n;
   },
@@ -328,6 +598,19 @@ var YC = {
       ? [...vis.querySelectorAll("chip-view-model, [role='tab']")]
           .map((c) => (c.textContent || "").trim()).filter(Boolean).join("/")
       : "";
+    const panelDetails = YC.transcriptPanels().map((p) => {
+      const content = p.querySelector("#content") || p;
+      const continuation = p.querySelector("ytd-continuation-item-renderer");
+      const spinner = continuation?.querySelector("tp-yt-paper-spinner, [active], .spinner");
+      return {
+        target: p.getAttribute("target-id") || "?",
+        visibility: (p.getAttribute("visibility") || "?").replace("ENGAGEMENT_PANEL_VISIBILITY_", ""),
+        contentChildren: content?.children?.length || 0,
+        continuation: !!continuation,
+        spinner: !!spinner,
+        textChars: (content?.textContent || "").trim().length,
+      };
+    });
     return {
       visiblePanel: vis ? (vis.getAttribute("target-id") || "?") + "=" +
         (vis.getAttribute("visibility") || "?").replace("ENGAGEMENT_PANEL_VISIBILITY_", "") : "none",
@@ -339,6 +622,8 @@ var YC = {
       timestampRowsUnder: ts.where,
       timestampGroups: ts.groups,
       stampOnly: (() => { try { return YC.stampOnlyCount(); } catch { return -1; } })(),
+      rawStampOnly: (() => { try { return YC.stampOnlyCount(true); } catch { return -1; } })(),
+      panelDetails,
       strategy: YC.lastPanelStrategy || "none matched",
       duration: YC.videoDuration(),
     };
@@ -364,6 +649,106 @@ var YC = {
     catch { return null; }
   },
 
+  // Coverage is a warning heuristic, never proof of transcription accuracy.
+  transcriptReadiness(segs, meta = {}) {
+    if (!segs?.length) return { ready: false, reason: "No transcript is available." };
+    const valid = segs.every(s => Number.isFinite(s.t) && s.t >= 0);
+    const last = Math.max(...segs.map(s => Number(s.t) || 0));
+    if (!valid || last === 0)
+      return { ready: false, reason: "This transcript has no usable timestamps." };
+    const duration = Number(meta.duration);
+    if (!(duration > 0)) return { ready: false, reason: "Transcript coverage could not be checked." };
+    if (segs.some((s, i) => i && s.t < segs[i - 1].t) || last > duration + 10)
+      return { ready: false, reason: "Transcript timing looks inconsistent." };
+    if (segs[0].t > 30 || segs.some((s, i) => i && s.t - segs[i - 1].t > 90))
+      return { ready: false, reason: "This transcript has long gaps. They may be missing speech or silence." };
+    if (duration - last > 30)
+      return { ready: false, reason: "This transcript may end early. Silence or an outro can also cause this." };
+    return { ready: true, reason: "" };
+  },
+
+  transcriptCacheId(videoId, lang = "en") {
+    return `${String(videoId || "")}:${String(lang || "en").toLowerCase()}`;
+  },
+
+  async readTranscriptCache(videoId, lang = "en") {
+    const store = YC.storage();
+    if (!store) return null;
+    try {
+      const payload = await store.get(YC.TRANSCRIPT_CACHE_KEY);
+      const records = payload?.[YC.TRANSCRIPT_CACHE_KEY];
+      const key = YC.transcriptCacheId(videoId, lang);
+      const record = records && typeof records === "object" ? records[key] : null;
+      if (!record || Date.now() - Number(record.savedAt || 0) > YC.TRANSCRIPT_CACHE_TTL_MS) return null;
+      if (!Array.isArray(record.segs) || !record.segs.length || record.videoId !== videoId) return null;
+      const segs = record.segs.map((segment) => ({
+        t: Math.max(0, Math.floor(Number(segment.t) || 0)),
+        text: String(segment.text || "").replace(/\s+/g, " ").trim(),
+      })).filter((segment) => segment.text);
+      if (!segs.length) return null;
+      return {
+        segs,
+        meta: {
+          videoId,
+          title: String(record.meta?.title || ""),
+          author: String(record.meta?.author || ""),
+          duration: Math.max(0, Math.floor(Number(record.meta?.duration) || 0)),
+        },
+        savedAt: Number(record.savedAt),
+        originalSource: String(record.source || ""),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async saveTranscriptCache(videoId, lang, segs, meta, source) {
+    const store = YC.storage();
+    if (!store || !Array.isArray(segs) || !segs.length) return false;
+    try {
+      const cleaned = segs.slice(0, 20_000).map((segment) => ({
+        t: Math.max(0, Math.floor(Number(segment.t) || 0)),
+        text: String(segment.text || "").replace(/\s+/g, " ").trim(),
+      })).filter((segment) => segment.text);
+      if (!cleaned.length) return false;
+
+      const payload = await store.get(YC.TRANSCRIPT_CACHE_KEY);
+      const existing = payload?.[YC.TRANSCRIPT_CACHE_KEY];
+      const records = existing && typeof existing === "object" ? { ...existing } : {};
+      const now = Date.now();
+      records[YC.transcriptCacheId(videoId, lang)] = {
+        version: 1,
+        videoId,
+        lang: String(lang || "en").toLowerCase(),
+        meta: {
+          title: String(meta?.title || "").slice(0, 500),
+          author: String(meta?.author || "").slice(0, 500),
+          duration: Math.max(0, Math.floor(Number(meta?.duration) || 0)),
+        },
+        segs: cleaned,
+        source: String(source || ""),
+        savedAt: now,
+      };
+
+      // Remove expired entries first, then oldest entries until both the count
+      // and Chrome storage budget are bounded. Successful extraction must still
+      // return if storage is full or unavailable.
+      let entries = Object.entries(records)
+        .filter(([, record]) => now - Number(record?.savedAt || 0) <= YC.TRANSCRIPT_CACHE_TTL_MS)
+        .sort((a, b) => Number(b[1]?.savedAt || 0) - Number(a[1]?.savedAt || 0));
+      entries = entries.slice(0, YC.TRANSCRIPT_CACHE_CAP);
+      let bounded = Object.fromEntries(entries);
+      while (entries.length > 1 && JSON.stringify(bounded).length > YC.TRANSCRIPT_CACHE_MAX_CHARS) {
+        entries.pop();
+        bounded = Object.fromEntries(entries);
+      }
+      await store.set({ [YC.TRANSCRIPT_CACHE_KEY]: bounded });
+      return !!bounded[YC.transcriptCacheId(videoId, lang)];
+    } catch {
+      return false;
+    }
+  },
+
   async logFailure(entry) {
     const store = YC.storage();
     if (!store) return null;
@@ -378,7 +763,7 @@ var YC = {
         url: entry.url || "",
         // The diagnostic block is bounded, but an unexpected error could carry a
         // huge message and storage.local is a shared budget.
-        message: String(entry.message || "").slice(0, 4000),
+        message: String(entry.message || "").slice(0, 16000),
         diagnostics: entry.diagnostics || null,
       };
       const cur = await store.get(YC.FAILURE_LOG_KEY);
@@ -463,13 +848,65 @@ var YC = {
      Transcript chip if one is present. */
   async selectTranscriptChip() {
     const panel = YC.visibleTranscriptPanel();
-    if (!panel) return false;
-    const chip = [...panel.querySelectorAll("chip-view-model, button, div[role='tab'], [role='tab']")]
-      .find((c) => /^transcript$/i.test((c.textContent || "").trim()));
-    if (!chip) return false;
+    if (!panel) {
+      YC.trace("panel.chip", { result: "no transcript panel" });
+      return false;
+    }
+    const candidates = [...panel.querySelectorAll("chip-view-model, button, div[role='tab'], [role='tab']")];
+    const matches = candidates.filter((c) => /^transcript$/i.test((c.textContent || "").trim()));
+    // A chip wrapper and its button have identical text. The button owns the
+    // selected state and click handler; clicking the wrapper can do nothing.
+    const chip = matches.find((c) => c.tagName.toLowerCase() === "button") || matches[0];
+    YC.trace("panel.chip.scan", {
+      panel: panel.getAttribute("target-id") || "?",
+      visibility: panel.getAttribute("visibility") || "?",
+      candidates: candidates.slice(0, 16).map((c) => ({
+        text: (c.textContent || "").trim().slice(0, 40),
+        selected: c.getAttribute("aria-selected") || "",
+        tag: c.tagName.toLowerCase(),
+      })),
+    });
+    if (!chip) {
+      YC.trace("panel.chip", { result: "Transcript chip not found" });
+      return false;
+    }
     const already = /true/i.test(chip.getAttribute("aria-selected") || "");
+    YC.trace("panel.chip", { result: already ? "already selected" : "clicking", tag: chip.tagName.toLowerCase() });
     if (!already) { chip.click(); await YC.sleep(900); }
     return true;
+  },
+
+  /* A transcript continuation can be present but never fire because YouTube has
+     rendered its panel at 0x0 pixels. Ask the service worker to invoke the
+     component's own MAIN-world continuation method. Cache any endpoint response
+     so extract() can consume it without issuing the request twice. */
+  async primeTranscriptContinuation() {
+    const panel = YC.expandedTranscriptPanel();
+    const continuation = panel?.querySelector("ytd-continuation-item-renderer");
+    if (!continuation) {
+      YC.trace("youtube.native_trigger.skip", { reason: "no continuation element" });
+      return false;
+    }
+    YC.trace("youtube.native_trigger.start", {
+      panel: panel.getAttribute("target-id") || "?",
+      panelWidth: Math.round(panel.getBoundingClientRect?.().width || 0),
+      panelHeight: Math.round(panel.getBoundingClientRect?.().height || 0),
+    });
+    try {
+      const response = await YC.transcriptEndpointResponse();
+      YC.lastEndpointResult = response;
+      const rows = response.nativeRendered ? (YC.fromPanel() || []) : [];
+      YC.trace("youtube.native_trigger.done", {
+        nativeRendered: !!response.nativeRendered,
+        domRows: rows.length,
+        hasFallbackData: !!response.data,
+      });
+      return rows.length > 0;
+    } catch (error) {
+      YC.lastEndpointError = error;
+      YC.trace("youtube.native_trigger.failed", { error: String(error?.message || error).slice(0, 240) });
+      return false;
+    }
   },
 
   /* `report(frac, message)` is optional, frac 0..1 across the opening phase only.
@@ -479,7 +916,11 @@ var YC = {
      looked frozen exactly when the user most wants to know something is happening.
      Every wait loop here now ticks, and every step says what it is doing. */
   async openPanel(report = null) {
-    const say = (f, m) => { if (report) report(Math.max(0, Math.min(1, f)), m); };
+    const say = (f, m) => {
+      const fraction = Math.max(0, Math.min(1, f));
+      YC.trace("panel.open", { fraction: Math.round(fraction * 100) / 100, message: m });
+      if (report) report(fraction, m);
+    };
 
     say(0.02, "checking for an open transcript");
     if (YC.fromPanel()) { say(1, "transcript already open"); return true; }
@@ -495,7 +936,13 @@ var YC = {
     if (YC.expandedTranscriptPanel()) {
       say(0.06, "transcript panel is open, selecting the Transcript tab");
       await YC.selectTranscriptChip();
-      for (let i = 0; i < 30; i++) {
+      say(0.09, "asking YouTube to trigger its transcript loader");
+      if (await YC.primeTranscriptContinuation()) {
+        say(1, "YouTube loaded the lines");
+        return true;
+      }
+      const deadline = Date.now() + 10000;
+      for (let i = 0; i < 30 && Date.now() < deadline; i++) {
         await YC.sleep(320);
         if (YC.fromPanel()) { say(1, "lines are in"); return true; }
         if (i === 8 || i === 18) {
@@ -511,7 +958,9 @@ var YC = {
         );
         if (cont) cont.scrollIntoView({ block: "nearest" });
       }
-      return !!YC.fromPanel();
+      const found = !!YC.fromPanel();
+      YC.trace("panel.open.done", { branch: "already-expanded", found });
+      return found;
     }
 
     // The button lives inside the (collapsed) description, so expand that first.
@@ -558,12 +1007,24 @@ var YC = {
     }
     if (!btn) { say(1, "no Show transcript button on this video"); return false; }
 
+    YC.trace("panel.button", {
+      tag: btn.tagName.toLowerCase(),
+      text: (btn.textContent || "").trim().slice(0, 80),
+      ariaLabel: (btn.getAttribute("aria-label") || "").slice(0, 80),
+    });
+
     say(0.24, "clicking Show transcript");
     btn.click();
     await YC.sleep(900);
     // the panel can open on the Timeline tab, so select Transcript before waiting
     await YC.selectTranscriptChip();
-    for (let i = 0; i < 25; i++) {
+    say(0.27, "asking YouTube to trigger its transcript loader");
+    if (await YC.primeTranscriptContinuation()) {
+      say(1, "YouTube loaded the lines");
+      return true;
+    }
+    const deadline = Date.now() + 8000;
+    for (let i = 0; i < 25 && Date.now() < deadline; i++) {
       await YC.sleep(320);
       if (YC.fromPanel()) { say(1, "lines are in"); return true; }
       if (i === 8) {
@@ -573,7 +1034,9 @@ var YC = {
         say(0.28 + (i / 25) * 0.68, `waiting for YouTube to load the lines (${i + 1}/25)`);
       }
     }
-    return !!YC.fromPanel();
+    const found = !!YC.fromPanel();
+    YC.trace("panel.open.done", { branch: "clicked-show-transcript", found });
+    return found;
   },
 
   /* YouTube virtualises the transcript list: for a long video only the visible
@@ -591,6 +1054,16 @@ var YC = {
       document.querySelector("ytd-transcript-segment-list-renderer #segments-container")?.parentElement ||
       document.querySelector("ytd-transcript-segment-list-renderer") ||
       document.querySelector("ytd-engagement-panel-section-list-renderer[target-id*='transcript'] #content");
+
+    YC.trace("panel.harvest.start", {
+      duration,
+      scroller: scroller ? {
+        tag: scroller.tagName.toLowerCase(),
+        id: scroller.id || "",
+        className: String(scroller.className || "").slice(0, 120),
+        height: scroller.scrollHeight || 0,
+      } : null,
+    });
 
     absorb();
     let stalls = 0, lastCount = seen.size;
@@ -616,18 +1089,32 @@ var YC = {
     }
     absorb();
     if (onProgress) onProgress(1, seen.size, 0);
-    return [...seen.entries()].sort((a, b) => a[0] - b[0]).map(([t, text]) => ({ t, text }));
+    const result = [...seen.entries()].sort((a, b) => a[0] - b[0]).map(([t, text]) => ({ t, text }));
+    YC.trace("panel.harvest.done", {
+      rows: result.length,
+      stalls,
+      elapsedMs: Date.now() - started,
+      lastTimestamp: result.length ? result[result.length - 1].t : null,
+    });
+    return result;
   },
 
   /* Ask youchop.app to fetch it. Used when the local paths are unavailable. */
   async fromApi(videoId, lang) {
+    YC.trace("youchop.api.request", { videoId, lang: lang || "en" });
     const r = await fetch("https://youchop.app/api/transcripts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [videoId], lang: lang || "en", timestamps: true }),
     });
+    YC.trace("youchop.api.response", { status: r.status, ok: r.ok });
+    const raw = await r.text();
+    YC.trace("youchop.api.body", { bytes: raw.length, nonWhitespace: raw.trim().length });
     if (!r.ok) throw new Error(`youchop API HTTP ${r.status}`);
-    const d = await r.json();
+    if (!raw.trim()) throw new Error("youchop API returned an empty response");
+    let d;
+    try { d = JSON.parse(raw); }
+    catch { throw new Error("youchop API returned invalid JSON"); }
     const t = d?.transcripts?.[0];
     if (!t?.ok || !t.text) throw new Error("no transcript available for this video");
     // the API returns "[m:ss] line" rows when timestamps are requested
@@ -637,6 +1124,7 @@ var YC = {
       const sec = m[3] ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
       return { t: sec, text: (m[4] || "").trim() };
     }).filter((r) => r.text);
+    YC.trace("youchop.api.parsed", { ok: !!t.ok, rows: rows.length, hasTitle: !!t.title, hasAuthor: !!t.author });
     return { rows, title: t.title || "", author: t.author || "" };
   },
 
@@ -654,7 +1142,23 @@ var YC = {
   hasChapters() {
     if (document.querySelector('ytd-engagement-panel-section-list-renderer[target-id*="macro-markers"]')) return true;
     if (document.querySelector("ytd-macro-markers-list-item-renderer")) return true;
-    return false;
+    const description = [
+      document.querySelector("#description-inline-expander"),
+      document.querySelector("ytd-watch-metadata #description"),
+    ].filter(Boolean).map((node) => node.innerText || node.textContent || "").join("\n");
+    return YC.textHasChapterSequence(description);
+  },
+
+  textHasChapterSequence(text) {
+    const starts = [];
+    for (const line of String(text || "").split(/\r?\n/)) {
+      const match = line.match(/^\s*((?:\d{1,2}:)?\d{1,2}:\d{2})\s+\S/);
+      if (!match) continue;
+      const start = YC.toSec(match[1]);
+      if (start !== null) starts.push(start);
+    }
+    if (starts.length < 3 || starts[0] !== 0) return false;
+    return starts.every((start, index) => index === 0 || start - starts[index - 1] >= 10);
   },
 
   /* Ask youchop.app to turn this video's transcript into paste-ready chapters.
@@ -662,44 +1166,191 @@ var YC = {
      server-side and refuses (cheaply, before spending transcript quota) if the
      video already has real chapters, so this stays correct even if the DOM
      signal above was wrong or stale. */
-  async fetchChapters(videoId) {
+  async fetchChapters(videoId, segs = null, meta = null) {
+    const payload = { id: videoId };
+    if (Array.isArray(segs) && segs.length) {
+      payload.segments = segs.map((s) => ({
+        start: Math.max(0, Math.floor(Number(s.t ?? s.start) || 0)),
+        text: String(s.text || "").replace(/\s+/g, " ").trim(),
+      })).filter((s) => s.text);
+      payload.meta = {
+        title: String(meta?.title || "").slice(0, 500),
+        author: String(meta?.author || "").slice(0, 500),
+        duration: Math.max(0, Math.floor(Number(meta?.duration) || 0)),
+      };
+    }
     const r = await fetch("https://youchop.app/api/chapterize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: videoId }),
+      body: JSON.stringify(payload),
     });
-    const d = await r.json().catch(() => null);
+    const raw = await r.text();
+    let d = null;
+    try { d = JSON.parse(raw); } catch {}
     if (!r.ok) throw new Error((d && (d.message || d.error)) || `chapterize HTTP ${r.status}`);
     if (!d) throw new Error("empty response from chapterize");
     return d;
   },
 
-  /* Tries, in order: YouTube's open transcript panel (free, local, most reliable),
-     the caption endpoint directly (free, but YouTube now bot-gates it and often
-     returns an empty body), then youchop.app as the fallback that always works. */
-  async extract(videoId, format = "clean", lang = "en", onProgress = null) {
+  async fetchPlaylistVideos(listId) {
+    // Prefer the signed-in page that the user can already see. This is required
+    // for private and unlisted playlists: an anonymous Vercel request correctly
+    // receives "playlist does not exist", while the authenticated YouTube tab
+    // has the full rows rendered locally. It also avoids a needless network hop
+    // for public playlists.
+    const local = YC.playlistVideosFromPage(listId);
+    if (local?.videos?.length) return local;
+
+    const r = await fetch(
+      "https://youchop.app/api/playlist-videos?listId=" + encodeURIComponent(listId)
+    );
+    const raw = await r.text();
+    let d = null;
+    try { d = JSON.parse(raw); } catch {}
+    if (!r.ok) throw new Error((d && (d.message || d.error)) || `playlist listing HTTP ${r.status}`);
+    if (!d?.videos?.length) throw new Error("playlist has no public videos");
+    return d;
+  },
+
+  playlistVideosFromPage(listId, root = (typeof document !== "undefined" ? document : null)) {
+    if (!root?.querySelectorAll) return null;
+    const rows = [...root.querySelectorAll(
+      "ytd-playlist-video-renderer, ytd-playlist-panel-video-renderer"
+    )];
+    const seen = new Set();
+    const videos = [];
+    for (const row of rows) {
+      const titleLink = row.querySelector?.("a#video-title") ||
+        row.querySelector?.('a[href*="/watch?v="]');
+      const videoId = YC.videoIdFrom(titleLink?.href || titleLink?.getAttribute?.("href") || "");
+      if (!videoId || seen.has(videoId)) continue;
+      seen.add(videoId);
+      const durationNode = row.querySelector?.(
+        "ytd-thumbnail-overlay-time-status-renderer #text, " +
+        "ytd-thumbnail-overlay-time-status-renderer, .yt-badge-shape__text"
+      );
+      const durationMatch = String(durationNode?.textContent || durationNode?.innerText || "")
+        .match(/\b\d{1,3}:\d{2}(?::\d{2})?\b/);
+      videos.push({
+        videoId,
+        title: String(
+          titleLink?.getAttribute?.("title") || titleLink?.textContent || titleLink?.innerText || videoId
+        ).replace(/\s+/g, " ").trim(),
+        seconds: durationMatch ? YC.toSec(durationMatch[0]) : null,
+        published: null,
+      });
+    }
+    if (!videos.length) return null;
+
+    const titleNode = root.querySelector?.(
+      "yt-page-header-renderer h1, ytd-playlist-header-renderer h1, " +
+      "yt-page-header-view-model h1, #title yt-formatted-string"
+    );
+    const pageTitle = String(root.title || "").replace(/\s*-\s*YouTube\s*$/i, "").trim();
+    return {
+      playlist: {
+        id: listId,
+        title: String(titleNode?.textContent || titleNode?.innerText || pageTitle || "YouTube playlist")
+          .replace(/\s+/g, " ").trim(),
+      },
+      videos,
+      truncated: false,
+      via: "browser-local",
+    };
+  },
+
+  async extractPlaylistVideo(videoId, lang = "en", jobId = "") {
+    if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      throw new Error("extension runtime unavailable");
+    }
+    const result = await chrome.runtime.sendMessage({
+      type: "youchop-extract-video",
+      videoId,
+      lang,
+      jobId,
+    });
+    if (!result?.ok) throw new Error(result?.error || "playlist video extraction failed");
+    return result;
+  },
+
+  /* Tries, in order: YouTube's open transcript panel, the panel's same-origin
+     get_transcript continuation, the caption endpoint directly, then youchop.app.
+     The first three are free and local; only the final provider path spends quota. */
+  async extract(videoId, format = "clean", lang = "en", onProgress = null, options = {}) {
     let meta = { videoId, title: document.title.replace(/ - YouTube$/, ""), author: "", duration: YC.videoDuration() };
     let segs = null, source = null;
+    YC.resetTrace({
+      runtime: YC.runtimeVersion(),
+      videoId,
+      page: location.href,
+      duration: meta.duration,
+      language: lang,
+    });
+    YC.lastPanelStrategy = null;
+    YC.lastEndpointResult = null;
+    YC.lastEndpointError = null;
+    YC.lastTranscriptNote = null;
+    YC.lastCaptionNote = null;
+
+    if (!options.refresh) {
+      const cached = await YC.readTranscriptCache(videoId, lang);
+      if (cached) {
+        meta = { ...meta, ...cached.meta, videoId };
+        segs = cached.segs;
+        source = "browser-cache";
+        YC.trace("path.browser_cache.success", {
+          rows: segs.length,
+          ageSeconds: Math.max(0, Math.floor((Date.now() - cached.savedAt) / 1000)),
+          originalSource: cached.originalSource,
+        });
+        if (onProgress) onProgress(1, segs.length, 0, "loaded saved transcript");
+        return { text: YC.render(segs, meta, format), meta, segs, source };
+      }
+      YC.trace("path.browser_cache.miss", { videoId, lang });
+    }
 
     // Preferred path: YouTube's own transcript panel. Free, local, and it is the
     // one path confirmed working, because YouTube fetched the data itself with
     // valid tokens and we only read the rendered DOM.
-    // The three paths get their own slice of the bar, so a chop that falls through
+    // The extraction paths share slices of the bar, so a chop that falls through
     // to a later path keeps moving forward instead of jumping back to a lower
     // percentage: opening 0-25%, reading rows 25-100%, and the two fallbacks
     // filling the same band when the panel path yields nothing.
     if (onProgress) onProgress(0, 0, null, "opening transcript");
-    if (await YC.openPanel(onProgress ? (f, m) => onProgress(f * 0.25, 0, null, m) : null)) {
+    const opened = await YC.openPanel(onProgress ? (f, m) => onProgress(f * 0.25, 0, null, m) : null);
+    YC.trace("panel.open.result", { opened, strategy: YC.lastPanelStrategy || "none" });
+    if (opened) {
       segs = await YC.harvestPanel(
         onProgress ? (f, n, eta) => onProgress(0.25 + f * 0.75, n, eta, "reading transcript") : null
       );
       if (segs?.length) {
         source = "panel";
+        YC.trace("path.panel.success", { rows: segs.length });
         // fill in author/title from the page, since we skipped the player response
         const ch = document.querySelector("#owner #channel-name a, ytd-channel-name#channel-name a");
         if (ch) meta.author = ch.textContent.trim();
         const h1 = document.querySelector("h1.ytd-watch-metadata yt-formatted-string, h1 yt-formatted-string");
         if (h1?.textContent.trim()) meta.title = h1.textContent.trim();
+      }
+    }
+
+    // If the panel is expanded but stuck on its continuation spinner, use the
+    // exact same authenticated YouTube endpoint the panel was trying to call.
+    // This is still local and free, unlike the final youchop.app provider path.
+    if (!segs?.length) {
+      const p = (f, m) => { if (onProgress) onProgress(f, 0, null, m); };
+      p(0.3, "panel stalled, asking YouTube directly");
+      try {
+        const s = await YC.fetchTranscriptContinuation();
+        if (s.length) {
+          segs = s; source = "youtube-transcript";
+          YC.lastTranscriptNote = `${s.length} lines`;
+          p(0.58, `got ${s.length} lines from YouTube`);
+        }
+      } catch (e) {
+        YC.lastTranscriptNote = String(e.message || e).slice(0, 100);
+        YC.trace("path.youtube_transcript.failed", { error: YC.lastTranscriptNote });
+        p(0.5, "YouTube transcript request failed");
       }
     }
 
@@ -712,6 +1363,11 @@ var YC = {
         meta = YC.meta(pr);
         p(0.42, "looking for a caption track");
         const track = YC.pickTrack(pr, lang);
+        YC.trace("captions.track.selected", track ? {
+          language: track.languageCode || "unknown",
+          kind: track.kind || "human",
+          name: YC.textValue(track.name).slice(0, 60),
+        } : { track: null });
         if (!track) { YC.lastCaptionNote = "video has no caption tracks"; p(0.5, "no caption track on this video"); }
         else {
           p(0.46, `downloading ${track.languageCode || lang} captions${track.kind === "asr" ? " (auto-generated)" : ""}`);
@@ -721,8 +1377,15 @@ var YC = {
         }
       } catch (e) {
         YC.lastCaptionNote = String(e.message || e).slice(0, 60);
+        YC.trace("path.captions.failed", { error: String(e.message || e).slice(0, 240) });
         p(0.5, "caption fetch failed");
       }
+    }
+
+    if (!segs && options.localOnly) {
+      throw new Error(
+        "Local YouTube extraction returned no transcript. Open this video normally, confirm Show transcript works, then retry the playlist."
+      );
     }
 
     if (!segs) {
@@ -735,20 +1398,27 @@ var YC = {
       } catch (e) {
         // Every path failed. Report what each one actually saw instead of guessing
         // at a cause, so the failure is diagnosable rather than mysterious.
+        YC.trace("path.youchop.failed", { error: String(e.message || e).slice(0, 240) });
         const d = YC.panelDiagnostics();
+        YC.trace("failure.dom_snapshot", d);
         const net = /failed to fetch|networkerror|load failed/i.test(String(e.message || e));
         const err = new Error(
           "Could not read the transcript.\n" +
+          `runtime: ${YC.runtimeVersion()}\n` +
+          `page: ${location.href}\n` +
           `panels: ${d.transcriptPanels}\n` +
           `visible panel: ${d.visiblePanel}  chips: ${d.chips}\n` +
+          `panel details: ${JSON.stringify(d.panelDetails)}\n` +
           `elements: ${d.segmentEls} segment, ${d.classVariants} class-variant\n` +
-          `timestamp rows in page: ${d.timestampRowsFound} (under <${d.timestampRowsUnder}>, ${d.timestampGroups} groups), stamp-only elements: ${d.stampOnly}\n` +
+          `timestamp rows in page: ${d.timestampRowsFound} (under <${d.timestampRowsUnder}>, ${d.timestampGroups} groups), filtered stamp-only: ${d.stampOnly}, raw stamp-only: ${d.rawStampOnly}\n` +
           `strategy: ${d.strategy}\n` +
+          `YouTube transcript endpoint: ${YC.lastTranscriptNote || "not reached"}\n` +
           `captions: ${YC.lastCaptionNote || "not reached"}\n` +
           `youchop.app: ${net ? "BLOCKED. Remove and re-add the extension so Chrome grants the new host permission (a plain reload does not always do it)." : String(e.message || e)}\n` +
           (d.timestampRowsFound === 0
             ? "No timestamped rows exist in the page at all, so the transcript is not open. Click Show transcript under the video, confirm you can see the lines, then click Chop."
-            : "Timestamped rows exist but were not recognised; send this text.")
+            : "Timestamped rows exist but were not recognised; send this text.") +
+          `\n\ndebug trace:\n${YC.formatTrace()}`
         );
         err.diagnostics = d;
         throw err;
@@ -756,6 +1426,9 @@ var YC = {
     }
 
     if (!segs?.length) throw new Error("no transcript available for this video");
+    const saved = await YC.saveTranscriptCache(videoId, lang, segs, meta, source);
+    YC.trace("path.browser_cache.write", { saved, rows: segs.length });
+    YC.trace("extract.success", { source, rows: segs.length, titleChars: meta.title.length, authorChars: meta.author.length });
     return { text: YC.render(segs, meta, format), meta, segs, source };
   },
 };

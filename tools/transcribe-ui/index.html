@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YouChop | Local transcripts</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><main>
+<a class="brand" href="/">You<span>Chop</span> <small>LOCAL</small></a>
+<h1>Turn audio into timestamped text.</h1>
+<p class="intro">Paste a YouTube or Instagram video link or choose an audio/video file. Speech recognition runs on this computer, free of API charges.</p>
+<form id="form">
+<label for="url">YouTube video or Instagram Reel</label><input id="url" type="url" placeholder="https://www.instagram.com/reel/…/" autocomplete="off">
+<div class="divider">or use a file</div>
+<label for="file">Audio or video, up to 150 MB</label><input id="file" type="file" accept="audio/*,video/*">
+<details><summary>Transcription quality</summary><label for="model">Model</label><select id="model"><option value="tiny">Tiny · fastest, least accurate</option><option value="base">Base · fast</option><option value="small" selected>Small · balanced</option><option value="medium">Medium · slower, more accurate</option></select></details>
+<button id="go" type="submit">Transcribe locally</button>
+<p class="note">A missing model downloads once. Your audio is never uploaded to a speech service. Site downloads can fail; local files work independently. Long videos may take longer than their runtime on a CPU.</p>
+</form>
+<p id="status" role="status" aria-live="polite"></p>
+<section id="result" hidden><h2>Your transcript</h2><p id="meta"></p><p class="note">Review names, numbers and wording against the audio. You can edit the text below.</p><label for="text" class="sr-only">Editable transcript</label><textarea id="text" rows="14"></textarea><div class="actions"><button id="copy" type="button">Copy text</button><button id="download" type="button">Download edited text</button><a id="markdown" download="transcript.md">Markdown</a><a id="srt" download="transcript.srt">Subtitles</a></div></section>
+</main></body></html>

@@ -2,7 +2,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "framework": null,
-  "installCommand": "",
+  "installCommand": "npm install",
   "buildCommand": "",
   "outputDirectory": ".",
   "functions": {

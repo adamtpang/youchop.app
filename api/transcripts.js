@@ -17,10 +17,17 @@
 //               (Authorization: Bearer). Standard REST error codes: 402 = out of
 //               credits, 429/408 = retryable.
 //   - ytio:          YT_TRANSCRIPT_TOKEN, youtube-transcript.io (paid, optional).
-// Batches capped at 50 ids. Mock mode needs no key.
+// Successful public transcripts are cached by video id + language for 30 days in
+// Vercel Runtime Cache. Batches capped at 50 ids. Mock mode needs no key.
 
 const YTIO_BASE = "https://www.youtube-transcript.io/api";
 const APIFY_ACTOR = process.env.APIFY_TRANSCRIPT_ACTOR || "karamelo~youtube-transcripts";
+const {
+  normalizeLanguage,
+  readCachedTranscripts,
+  writeCachedTranscripts,
+  stripTimestamps,
+} = require("./transcript-cache");
 
 async function readJson(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -306,15 +313,76 @@ function providerChain() {
   return chain;
 }
 
-/** Programmatic entry used by /api/chapterize and the HTTP handler. */
+function presentTranscript(transcript, withTs) {
+  if (!transcript) return transcript;
+  return {
+    ...transcript,
+    text: withTs ? String(transcript.text || "") : stripTimestamps(transcript.text),
+  };
+}
+
+function unavailableTranscript(videoId, reason) {
+  return {
+    videoId,
+    title: "",
+    author: "",
+    ok: false,
+    text: "",
+    reason: reason || "transcript unavailable",
+  };
+}
+
+function mergeTranscripts(list, cached, fresh, withTs, fallbackReason) {
+  const freshById = new Map((fresh || []).map((item) => [item.videoId, item]));
+  return list.map((videoId) => presentTranscript(
+    cached.get(videoId) || freshById.get(videoId) || unavailableTranscript(videoId, fallbackReason),
+    withTs,
+  ));
+}
+
+/** Programmatic entry used by /api/chapterize and the HTTP handler.
+ *
+ * Cache entries are canonical timestamped transcripts. A clean-text request is
+ * derived from that canonical copy, so asking for the other display format never
+ * spends a second provider credit for the same video and language. */
 async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock }) {
   const list = Array.isArray(ids) ? ids.slice(0, 50) : [];
   const withTs = !!timestamps;
   if (useMock) return { ok: true, transcripts: mock(list, withTs), provider: "mock" };
   if (!list.length) return { ok: false, status: 400, body: { error: "Provide an 'ids' array of YouTube video IDs (max 50)." } };
 
+  const preferredLang = normalizeLanguage(lang);
+  // Debug calls intentionally bypass the cache so provider diagnostics describe
+  // the provider, not an old successful response.
+  const cached = debug ? new Map() : await readCachedTranscripts(list, preferredLang);
+  const missing = [...new Set(list.filter((videoId) => !cached.has(videoId)))];
+  const cacheMeta = {
+    layer: "vercel-runtime",
+    ttlDays: 30,
+    hits: list.filter((videoId) => cached.has(videoId)).length,
+    misses: missing.length,
+    writes: 0,
+  };
+
+  if (!missing.length) {
+    return {
+      ok: true,
+      transcripts: mergeTranscripts(list, cached, [], withTs),
+      provider: "cache",
+      cache: cacheMeta,
+    };
+  }
+
   const chain = providerChain();
   if (!chain.length) {
+    if (cached.size) {
+      return {
+        ok: true,
+        transcripts: mergeTranscripts(list, cached, [], withTs, "not cached and no provider configured"),
+        provider: "cache",
+        cache: cacheMeta,
+      };
+    }
     return {
       ok: false,
       status: 500,
@@ -322,13 +390,14 @@ async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock })
     };
   }
 
-  const preferredLang = typeof lang === "string" && /^[a-zA-Z-]{2,8}$/.test(lang) ? lang : "en";
   let lastError = null;
   const attempted = [];
   for (const name of chain) {
     const isLast = name === chain[chain.length - 1];
     try {
-      const result = await PROVIDERS[name](list, withTs, debug, preferredLang);
+      // Always obtain the timestamped form. Clean text is derived locally, so
+      // there is exactly one provider/cache entry per video and language.
+      const result = await PROVIDERS[name](missing, true, debug, preferredLang);
       if (!result.error) {
         // A provider can answer with no top-level error yet every single video
         // still failed (e.g. Supadata returning a per-video 429, which is not
@@ -342,7 +411,16 @@ async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock })
           result.provider = name;
           if (attempted.length) result.fellBackFrom = attempted;
           await enrichTitles(result.transcripts);
-          return { ok: true, ...result };
+          cacheMeta.writes = debug ? 0 : await writeCachedTranscripts(
+            (result.transcripts || []).filter((transcript) => transcript.ok),
+            preferredLang,
+          );
+          return {
+            ok: true,
+            ...result,
+            transcripts: mergeTranscripts(list, cached, result.transcripts, withTs),
+            cache: cacheMeta,
+          };
         }
         lastError = { status: 502, body: { error: "empty_batch", provider: name, detail: (result.transcripts || []).map((t) => t.reason).filter(Boolean) } };
         attempted.push(name);
@@ -355,6 +433,22 @@ async function fetchTranscripts({ ids, timestamps, debug, lang, mock: useMock })
       attempted.push(name);
     }
   }
+  if (cached.size) {
+    return {
+      ok: true,
+      transcripts: mergeTranscripts(
+        list,
+        cached,
+        [],
+        withTs,
+        (lastError && lastError.body && lastError.body.error) || "provider failed",
+      ),
+      provider: "cache",
+      cache: cacheMeta,
+      providerError: lastError && lastError.body,
+    };
+  }
+  lastError = lastError || { status: 502, body: { error: "transcript_failed" } };
   lastError.body.attempted = attempted;
   return { ok: false, status: lastError.status, body: lastError.body };
 }

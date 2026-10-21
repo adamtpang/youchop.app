@@ -27,8 +27,6 @@ kin:
     why: summon.guide's figure grounding (src/lib/figureSources.ts) is built from curated episodes youchop.app extracted, e.g. the John Vervaeke figure's 6 sourced episodes trace directly back to a youchop.app corpus run.
   - repo: skill.supply
     why: skill.supply's research discipline (verifying claims like Naval Ravikant's actual words against a real transcript rather than a paraphrase) is exactly what tools/corpus.mjs is built for; skill.supply can pull a full channel or episode corpus through youchop.app instead of relying on search-snippet paraphrase for grounding
-  - repo: strummer.fun
-    why: Both are "paste a YouTube URL and get something extracted back" tools built by Adam. tools/corpus.mjs's yt-dlp-based, resumable extraction pattern (URL-to-video-ID parsing, local pull with no API quota) is the closest existing reference for strummer-desktop's planned AI-stemming feature, which needs to pull audio from a Spotify/YouTube link before separating it into Ableton stems, though corpus.mjs itself only pulls caption text today, not audio.
   - repo: eyeland.cards
     why: Reciprocal of eyeland.cards' own edge here. tools/corpus.mjs extracted the full JelloApocalypse "Let's Make a Pokemon Game" pitch into eyeland.cards' game/research/, which is the primary source behind four of its DESIGN.md principles (6, 6a, 6b, 7) that were previously cited with no saved source. Same extractor-to-destination shape as the summon.company edge above, applied to game-design research instead of a knowledge corpus.
 

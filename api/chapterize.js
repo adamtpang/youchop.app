@@ -16,7 +16,9 @@ const { fetchTranscripts, parseVideoId, hms } = require("./transcripts");
 // ANTHROPIC_API_KEY that was silently forcing every request onto the heuristic
 // fallback engine.
 const MODEL = process.env.CHAPTERIZE_MODEL || "claude-haiku-4-5-20251001";
-const MAX_TRANSCRIPT_CHARS = 120_000;
+const MAX_TRANSCRIPT_CHARS = 600_000;
+const MAX_SUPPLIED_SEGMENTS = 20_000;
+const CHAPTER_CREDIT = "⏱ Chapters by https://youchop.app";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
   "Chrome/124.0.0.0 Safari/537.36";
@@ -29,6 +31,43 @@ const UA =
 // browser) sees it, same trick channel-videos.js already uses for channel pages.
 // Checked BEFORE spending any transcript-provider quota, so a video that already
 // has chapters never burns a request against the free tiers for nothing.
+function timestampSeconds(value) {
+  const parts = String(value || "").trim().split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function textHasChapterSequence(text) {
+  const starts = [];
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const match = line.match(/^\s*((?:\d{1,2}:)?\d{1,2}:\d{2})\s+\S/);
+    if (!match) continue;
+    const start = timestampSeconds(match[1]);
+    if (start !== null) starts.push(start);
+  }
+  if (starts.length < 3 || starts[0] !== 0) return false;
+  return starts.every((start, index) => index === 0 || start - starts[index - 1] >= 10);
+}
+
+function htmlHasExistingChapters(html) {
+  const source = String(html || "");
+  if (/engagement-panel-macro-markers|ytd-macro-markers-list-item-renderer/i.test(source)) return true;
+
+  // Creator-authored timestamps live in shortDescription even when YouTube does
+  // not render the macro-marker panel into the initial HTML. Decode only that
+  // JSON string and apply YouTube's own basic chapter rules: 0:00 first, at
+  // least three entries, and at least ten seconds between entries.
+  const descriptions = source.matchAll(/"shortDescription":"((?:\\.|[^"\\])*)"/g);
+  for (const match of descriptions) {
+    try {
+      if (textHasChapterSequence(JSON.parse(`"${match[1]}"`))) return true;
+    } catch {}
+  }
+  return false;
+}
+
 async function hasExistingChapters(videoId) {
   try {
     const r = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
@@ -36,7 +75,7 @@ async function hasExistingChapters(videoId) {
     });
     if (!r.ok) return null; // unknown; do not block generation on a lookup failure
     const html = await r.text();
-    return /engagement-panel-macro-markers/i.test(html);
+    return htmlHasExistingChapters(html);
   } catch {
     return null; // unknown; same reasoning
   }
@@ -92,6 +131,44 @@ function parseTimestamped(text) {
   return segs;
 }
 
+/* The extension has already extracted timestamped rows in the user's own tab.
+   Accept those rows directly instead of spending a second provider credit for
+   the same transcript. Keep this input deliberately narrow and bounded because
+   /api/chapterize is public and the transcript may later be sent to Anthropic. */
+function readSuppliedSegments(body) {
+  const raw = body && (body.segments ?? body.segs);
+  if (!Array.isArray(raw)) return { provided: false, segments: [] };
+  if (!raw.length) return { provided: true, error: "segments must not be empty" };
+  if (raw.length > MAX_SUPPLIED_SEGMENTS) {
+    return { provided: true, error: `segments exceeds the ${MAX_SUPPLIED_SEGMENTS.toLocaleString()} row limit` };
+  }
+
+  let chars = 0;
+  const rows = [];
+  const seen = new Set();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const start = Math.floor(Number(item.start ?? item.t ?? item.seconds));
+    const text = String(item.text || "").replace(/\s+/g, " ").trim();
+    if (!Number.isFinite(start) || start < 0 || start > 7 * 24 * 3600 || !text) continue;
+    chars += text.length;
+    if (chars > MAX_TRANSCRIPT_CHARS) {
+      return { provided: true, error: `segments exceeds the ${MAX_TRANSCRIPT_CHARS.toLocaleString()} character limit` };
+    }
+    const key = `${start}|${text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ start, text });
+  }
+  rows.sort((a, b) => a.start - b.start);
+  if (!rows.length) return { provided: true, error: "segments contained no valid timestamped text" };
+  return { provided: true, segments: rows };
+}
+
+function timestampedText(segments) {
+  return segments.map((s) => `[${hms(s.start)}] ${s.text}`).join("\n");
+}
+
 function cleanTitle(s) {
   let t = String(s || "")
     .replace(/[\[\]]/g, "")
@@ -113,13 +190,17 @@ function cleanTitle(s) {
   return t || "Section";
 }
 
-function heuristicChapters(segs) {
+function targetChapterSeconds(duration) {
+  return duration < 180 ? 45 : duration < 900 ? 90 : 150;
+}
+
+function heuristicChapters(segs, videoDuration = 0) {
   if (!segs.length) return [];
   const lastStart = segs[segs.length - 1].start;
-  const duration = Math.max(lastStart, 1);
-  // Target ~1 chapter per 90–150s, min 3 max 20 for short/long
-  const targetSec = duration < 180 ? 45 : duration < 900 ? 90 : 150;
-  const maxCh = duration < 120 ? 4 : duration < 600 ? 12 : 20;
+  const duration = Math.max(lastStart, videoDuration, 1);
+  // Keep cutting through the final transcript row. There is intentionally no
+  // chapter-count ceiling: a long video needs more chapters, not an early stop.
+  const targetSec = targetChapterSeconds(duration);
 
   const chapters = [{ start: 0, title: cleanTitle(segs[0].text) }];
   let bucketStart = 0;
@@ -135,7 +216,7 @@ function heuristicChapters(segs) {
     const elapsed = s.start - bucketStart;
     const hardGap = gap >= 4; // caption silence / new beat
     const longEnough = elapsed >= targetSec;
-    const force = chapters.length < maxCh && longEnough && (hardGap || elapsed >= targetSec * 1.6);
+    const force = longEnough && (hardGap || elapsed >= targetSec * 1.6);
 
     if (force && s.start - lastCut >= Math.min(30, targetSec * 0.5)) {
       chapters.push({ start: s.start, title: cleanTitle(s.text) });
@@ -154,7 +235,49 @@ function heuristicChapters(segs) {
   }
   if (!out.length) out.push({ start: 0, title: "Introduction" });
   else out[0].start = 0;
-  return out.slice(0, maxCh);
+  return out;
+}
+
+function ensureFullCoverage(chapters, segs, videoDuration = 0) {
+  if (!chapters.length || !segs.length) return chapters;
+  const transcriptEnd = segs[segs.length - 1].start;
+  const duration = Math.max(videoDuration, transcriptEnd, 1);
+  const maxGap = targetChapterSeconds(duration) * 2;
+  const fallback = heuristicChapters(segs, duration);
+  const out = chapters
+    .map((chapter) => ({ start: Math.max(0, Math.floor(Number(chapter.start) || 0)), title: chapter.title }))
+    .filter((chapter) => chapter.title && chapter.start <= duration)
+    .sort((a, b) => a.start - b.start);
+
+  // Fill every oversized gap with deterministic transcript-derived chapters.
+  // This also repairs a model response that stops after a fixed number of items
+  // while the transcript continues for another hour.
+  for (const candidate of fallback) {
+    const sorted = out.slice().sort((a, b) => a.start - b.start);
+    let previous = sorted[0] || { start: 0 };
+    let next = null;
+    for (const chapter of sorted) {
+      if (chapter.start <= candidate.start) previous = chapter;
+      else { next = chapter; break; }
+    }
+    const gapEnd = next ? next.start : duration;
+    if (
+      gapEnd - previous.start > maxGap &&
+      candidate.start - previous.start >= 10 &&
+      (!next || next.start - candidate.start >= 10)
+    ) {
+      out.push(candidate);
+    }
+  }
+
+  out.sort((a, b) => a.start - b.start);
+  const deduped = [];
+  for (const chapter of out) {
+    if (deduped.length && chapter.start - deduped[deduped.length - 1].start < 10) continue;
+    deduped.push(chapter);
+  }
+  if (deduped.length) deduped[0].start = 0;
+  return deduped;
 }
 
 function toPaste(chapters) {
@@ -175,13 +298,10 @@ function mockChapters() {
   ];
 }
 
-async function anthropicChapters({ title, author, transcript }) {
+async function anthropicChapters({ title, author, transcript, duration = 0 }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return { error: "no_anthropic_key" };
-
-  const clipped = transcript.length > MAX_TRANSCRIPT_CHARS
-    ? transcript.slice(0, MAX_TRANSCRIPT_CHARS) + "\n…[truncated]"
-    : transcript;
+  if (transcript.length > MAX_TRANSCRIPT_CHARS) return { error: "transcript_too_large" };
 
   const prompt = `You write YouTube description chapters from a timestamped transcript.
 
@@ -191,14 +311,17 @@ Rules:
 - start is integer seconds from the beginning of the video
 - Titles: 3–7 words, topic-based, search-friendly. Never "Introduction", "Main Discussion", "Conclusion", "Part 1"
 - Prefer natural topic shifts over fixed intervals
-- About 1 chapter per 1.5–3 minutes; min 3, max 20
+- About 1 chapter per 1.5–3 minutes; minimum 3, with no fixed maximum
+- Cover the complete video and every major topic through the final transcript timestamp
+- Do not stop after 20 chapters or any other arbitrary count
 - No markdown, no commentary, no trailing commas
 
 Video title: ${title || "(unknown)"}
 Channel: ${author || "(unknown)"}
+Video duration: ${duration ? hms(duration) : "(infer from transcript)"}
 
 Timestamped transcript:
-${clipped}`;
+${transcript}`;
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -209,7 +332,7 @@ ${clipped}`;
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1200,
+      max_tokens: 8192,
       temperature: 0.2,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -239,7 +362,7 @@ ${clipped}`;
   }
   if (!chapters.length) return { error: "empty_chapters" };
   chapters[0].start = 0;
-  return { chapters: chapters.slice(0, 20), model: MODEL };
+  return { chapters, model: MODEL };
 }
 
 module.exports = async (req, res) => {
@@ -254,26 +377,48 @@ module.exports = async (req, res) => {
   const videoId = resolveVideoId(body, req.query);
   const wantMock = !!(body.mock || (req.query && req.query.mock === "1"));
   const enginePref = String(body.engine || "auto").toLowerCase();
+  const supplied = readSuppliedSegments(body);
 
   if (!videoId && !wantMock) {
     return res.status(400).json({ error: "missing_video", message: "Provide url or id (YouTube video)." });
   }
+  if (supplied.error) {
+    return res.status(400).json({ error: "invalid_segments", message: supplied.error });
+  }
 
-  // 0) Whether the video already has chapters is informational only, never
-  // blocking, a user may want their own or better chapters even when some
-  // already exist (their own words: "I should be able to chapterize even if a
-  // video has one"). Run it alongside the transcript fetch rather than before
-  // it, so reporting this costs no extra latency on the critical path.
-  const existingCheck = (!wantMock && videoId) ? hasExistingChapters(videoId) : Promise.resolve(null);
+  // Refuse before using transcript-provider or model quota. The extension also
+  // checks the live DOM, but the server remains the final guard for web callers
+  // and stale client pages.
+  const existingStatus = (!wantMock && videoId) ? await hasExistingChapters(videoId) : false;
+  if (existingStatus === true) {
+    return res.status(409).json({
+      error: "already_chapterized",
+      message: "This video already has YouTube chapters, so YouChop did not generate a duplicate set.",
+      videoId,
+    });
+  }
 
   // 1) Transcript with timestamps
-  const tx = await fetchTranscripts({
-    ids: [videoId || "jNQXAC9IVRw"],
-    timestamps: true,
-    mock: wantMock,
-    lang: body.lang,
-  });
-  const alreadyHasChapters = !!(await existingCheck);
+  const suppliedMeta = body.meta && typeof body.meta === "object" ? body.meta : {};
+  const tx = supplied.provided
+    ? {
+        ok: true,
+        provider: "browser-local",
+        transcripts: [{
+          videoId,
+          title: String(suppliedMeta.title || "").slice(0, 500),
+          author: String(suppliedMeta.author || "").slice(0, 500),
+          language: String(body.lang || "en").slice(0, 16),
+          ok: true,
+          text: timestampedText(supplied.segments),
+        }],
+      }
+    : await fetchTranscripts({
+        ids: [videoId || "jNQXAC9IVRw"],
+        timestamps: true,
+        mock: wantMock,
+        lang: body.lang,
+      });
   if (!tx.ok) return res.status(tx.status || 502).json(tx.body || { error: "transcript_failed" });
 
   const t = (tx.transcripts || [])[0];
@@ -296,6 +441,20 @@ module.exports = async (req, res) => {
     engine = "mock";
   } else {
     const segs = parseTimestamped(t.text);
+    const requestedDuration = Math.max(0, Math.floor(Number(suppliedMeta.duration) || 0));
+    if (supplied.provided && requestedDuration && segs.length) {
+      const transcriptEnd = segs[segs.length - 1].start;
+      const tolerance = Math.max(180, Math.min(600, Math.floor(requestedDuration * 0.05)));
+      if (transcriptEnd < requestedDuration - tolerance) {
+        return res.status(422).json({
+          error: "incomplete_transcript",
+          message: `The extracted transcript stops at ${hms(transcriptEnd)}, but the video runs ${hms(requestedDuration)}. Reopen the full transcript and retry; YouChop will not return partial chapters.`,
+          videoId,
+          transcriptEnd,
+          duration: requestedDuration,
+        });
+      }
+    }
     const tryAnthropic =
       enginePref === "anthropic" || (enginePref === "auto" && !!process.env.ANTHROPIC_API_KEY);
     const tryHeuristic = enginePref === "heuristic" || enginePref === "auto" || enginePref === "anthropic";
@@ -305,6 +464,7 @@ module.exports = async (req, res) => {
         title: t.title,
         author: t.author,
         transcript: t.text,
+        duration: requestedDuration,
       });
       if (llm.chapters) {
         chapters = llm.chapters;
@@ -329,10 +489,11 @@ module.exports = async (req, res) => {
         engine = "heuristic";
         engineMeta.note = "no_timestamps_in_transcript";
       } else {
-        chapters = heuristicChapters(segs);
+        chapters = heuristicChapters(segs, requestedDuration);
         engine = "heuristic";
       }
     }
+    chapters = ensureFullCoverage(chapters || [], segs, requestedDuration);
   }
 
   if (!chapters || !chapters.length) {
@@ -345,18 +506,16 @@ module.exports = async (req, res) => {
     title: t.title || "",
     author: t.author || "",
     language: t.language || "",
-    // Informational, not blocking: the video may already have chapters (its own
-    // or YouTube's auto-chapters), generate a set anyway if asked to.
-    alreadyHasChapters,
+    alreadyHasChapters: false,
     chapters: chapters.map((c) => ({
       start: c.start,
       timestamp: c.start === 0 ? "0:00" : hms(c.start),
       title: c.title,
     })),
     paste,
-    // URL-free watermark (see GROWTH.md), creator can strip before pasting
-    pasteWithCredit: paste + "\n\n⏱ Chapters by YouChop",
+    pasteWithCredit: paste + "\n\n" + CHAPTER_CREDIT,
     transcriptProvider: tx.provider,
+    transcriptCache: tx.cache || null,
     engine,
     ...engineMeta,
   });

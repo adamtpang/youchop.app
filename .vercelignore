@@ -1,0 +1,21 @@
+# Local credentials, agent state, and private/generated exports
+.env*
+.claude/
+.gstack/
+exports/
+STATUS.md
+*_CONTINUE_FROM_*.md
+*_SYNC_*.md
+
+# Development-only source and internal operating material
+extension/
+tools/
+company/
+sales/
+*.test.cjs
+*.md
+repos.yaml
+
+# Repository metadata
+.git/
+.gitignore

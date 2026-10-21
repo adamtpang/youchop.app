@@ -185,12 +185,9 @@
         if (d.error === "no_transcript") msg = "No captions yet for that video. Wait for YouTube auto-captions, then retry.";
         if (d.error === "no_provider") msg = "Transcript backend not configured on the server.";
         if (d.error === "missing_video") msg = "That doesn't look like a YouTube link.";
+        if (d.error === "already_chapterized") msg = "That video already has YouTube chapters, so YouChop did not create a duplicate set.";
+        if (d.error === "incomplete_transcript") msg = d.message;
         return showErr(msg, d.detail ? String(d.detail).slice(0, 160) : "");
-      }
-      // Informational only: still render whatever was generated. The video
-      // having chapters already doesn't mean these ones aren't wanted too.
-      if (d.alreadyHasChapters) {
-        showNote("Heads up: this video already has chapters (creator-added or YouTube auto-chapters). These are a separate, generated set.");
       }
       last = d;
       render(d);

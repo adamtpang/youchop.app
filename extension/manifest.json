@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "YouChop: 1-click YouTube transcripts",
-  "version": "0.8.9",
-  "description": "Grab any YouTube video's transcript in one click. Clean text for Claude, ChatGPT or Cursor. Runs locally: no account, no API key, nothing leaves your machine.",
+  "name": "YouChop: YouTube & Instagram transcripts",
+  "version": "0.14.0",
+  "description": "Extract YouTube transcripts in your browser. Instagram video posts use the free local transcriber.",
   "permissions": [
     "clipboardWrite",
     "storage",
@@ -12,7 +12,8 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://youchop.app/*"
+    "https://youchop.app/*",
+    "http://127.0.0.1/*"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -39,6 +40,7 @@
         "https://www.youtube.com/*"
       ],
       "js": [
+        "channel-queue.js",
         "lib.js",
         "content.js"
       ],

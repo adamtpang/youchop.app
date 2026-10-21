@@ -13,6 +13,7 @@
            font: 600 14px/1 "Segoe UI", sans-serif; padding: 12px; cursor: pointer; }
   button:hover { filter: brightness(1.1); }
   button[disabled] { background: #2a2a33; color: #8f8d96; cursor: default; }
+  #go-playlist { margin-top: 8px; display: none; background: #ffb43a; color: #16161c; }
   .note { font-size: 11.5px; color: #8f8d96; margin-top: 12px; }
   .log { margin-top: 14px; padding-top: 12px; border-top: 1px solid #2a2a33; display: none; }
   .log-row { display: flex; gap: 8px; margin-top: 8px; }
@@ -27,6 +28,7 @@
   <div class="brand">You<span class="blade"></span>Chop</div>
   <p id="msg">Open a YouTube video, then click Chop.</p>
   <button id="go" disabled>Chop this video</button>
+  <button id="go-playlist" disabled>Chop this playlist</button>
   <div class="log" id="log">
     <div id="log-msg"></div>
     <div class="log-row">
@@ -34,9 +36,10 @@
       <button id="log-clear">Clear</button>
     </div>
   </div>
-  <div class="note">Runs locally in your browser. No account, no API key, nothing leaves your machine.
+  <div class="note">Video and playlist transcripts run locally in your browser. Chapter generation sends the extracted transcript to youchop.app.
   &middot; <a href="https://youchop.app/extract" target="_blank">Whole channel &rarr;</a></div>
 <script src="lib.js"></script>
+<script src="instagram.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>

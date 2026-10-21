@@ -15,7 +15,7 @@ window.VITALS = {
   knowledgeBase: [
     { file: "README.md", desc: "What YouChop is, current state, how to work on it" },
     { file: "STRATEGY.md", desc: "Positioning, north star, kill gates, moat, the red-teamed operating model" },
-    { file: "GROWTH.md", desc: "The two loops: creator sample outreach + compliant copy-paste comments" },
+    { file: "GROWTH.md", desc: "The two loops: creator sample outreach + useful optional attribution" },
     { file: "ECONOMICS.md", desc: "Cost per chop, pricing, margins, path to $1k/month" },
   ],
 
@@ -32,8 +32,8 @@ window.VITALS = {
       next: "Publish the extension to the Chrome Web Store, title: 'YouChop, AI Chapters & Timestamps for YouTube'." },
     { label: "First Chapterize (activation)", value: 0, target: 10, unit: "successful /chop or API chapterizes", key: "activation",
       next: "Drive creators + Adam dogfood to /chop after each upload; log 200s from /api/chapterize." },
-    { label: "Paste-comment survival %", value: 0, target: 80, hint: "loop kill switch at <60%", key: "survival",
-      next: "Weekly incognito spot-check of 10 pasted comments once the loop is live." },
+    { label: "Attributed share retention %", value: 0, target: 25, hint: "optional and editable", key: "survival",
+      next: "Measure how often users voluntarily keep attribution without rewarding a YouTube action." },
   ],
 
   charts: [
@@ -85,7 +85,7 @@ window.VITALS = {
       { label: "Live Stripe checkout on /creators ($99 pack)", done: false },
       { label: "Publish extension to CWS, chapters/timestamps keyword title", done: false },
       { label: "Anonymous first chop (1 device-scoped credit)", done: false },
-      { label: "Copy-paste block: URL-free rotating watermark, +1 credit on copy", done: false },
+      { label: "Editable URL-free attribution, no comment-linked reward", done: true },
       { label: "Paste-a-URL web fallback ships BEFORE paste loop defaults on", done: true },
       { label: "Price-test $99 vs $79 on first 10 sales", done: false },
     ] },
@@ -113,7 +113,7 @@ window.VITALS = {
 
   decisions: [
     { date: "2026-07-28", decision: "Ship web self-serve one-video chapterize (/chop) before extension rebuild", why: "Extension source is lost; creator-revenue-first needs a working transcript→chapters→paste path for Adam's own essay uploads and for free samples. /api/chapterize reuses live Supadata transcripts + ANTHROPIC_API_KEY (already on Vercel) with heuristic fallback. Activation metric = First Chapterize.", revisit: "If heuristic quality loses sample replies, force engine=anthropic only; if Anthropic spend spikes, cap free /chop." },
-    { date: "2026-07-02", decision: "Compliance stance: NEVER auto-post to YouTube", why: "Automated commenting is an unambiguous ToS violation and CWS spam trigger; ~80% of the loop's value survives manual paste. Copy credit is +1, granted on copy. Watermark is URL-free ('⏱ Chapters by YouChop', rotating phrasings), links get comments silently held. The loop is an instrumented experiment with a shutdown switch: <60% comment survival for 2 checks, or one creator complaint → watermark opt-in, credit dies.", revisit: "Weekly survival checks; loop design if share conversion < 1 new user per 200 chops for 2 months." },
+    { date: "2026-08-30", decision: "No rewards tied to YouTube comments or other engagement", why: "YouTube's developer policies prohibit direct or indirect rewards for adding comments. YouChop may present useful video-specific chapters with short, editable, URL-free attribution, but copying is explicit, publishing is always manual, and no credit or feature is contingent on a YouTube action.", revisit: "Make attribution opt-in by default if creators complain or usage becomes repetitive or promotional." },
     { date: "2026-07-02", decision: "B-first: presell the $99 creator pack NOW with manual fulfillment", why: "Creators demonstrably pay (TimeSkip $19–39/mo, ChapterMe $24/mo); viewers don't (60+ free tools, Eightify's $4.99 is the ceiling, TimeSkip's ~2k users is the honest demand base rate). The demand test needs zero new code, chop 3–5 sample videos per target channel and email them. Bulk engineering is gated on 5 presales or 10% reply rate, never on viewer metrics.", revisit: "If 300 sends yield <3% reply or <5 paid: reposition to agencies; if that fails 200 more sends, clean shutdown." },
     { date: "2026-07-02", decision: "Bulk architecture: OAuth captions.download primary, throttled extension-fetch fallback", why: "The buyer owns the videos, creator-consented API access is the one ToS-clean path that survives any transcript-scraping lockdown (converts fatal platform risk into quota management). No server-side YouTube scraping, ever. Whisper contingency pre-priced at $149/200 videos so the fallback can't fulfill at negative margin.", revisit: "If captions.download quota/coverage fails the 20-channel test." },
     { date: "2026-07-02", decision: "Pricing: $99 one-time / 200 videos + $12/mo continuity sub; sample-only pre-sale", why: "$39 would donate surplus against every anchor (ChapterMe $2.40/video, TimeSkip $0.78–1.27/video; $99 = $0.50/video, still 2–5x cheaper). The one-time pack ends the relationship, the sub is the actual MRR and the moat. Full-catalog demos would burn $160–440/mo pre-sale COGS; samples cost $0.05–0.15/prospect.", revisit: "Reprice after 10 sales on observed close rate; agencies may support $299+." },

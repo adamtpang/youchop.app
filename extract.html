@@ -641,12 +641,13 @@
     a.click(); URL.revokeObjectURL(a.href);
   };
 
-  // ---- prefill from ?channel= ----
-  // The extension's channel-page "Chop channel" button links here with the
-  // handle attached, so land on the right tab with the search already running
+  // ---- prefill from ?channel= or ?playlist= ----
+  // Extension buttons can link here with a channel or playlist attached, so
+  // land on the right tab with the search already running
   // instead of making someone retype what they just clicked from.
   (function prefillFromQuery() {
-    var ref = new URLSearchParams(location.search).get("channel");
+    var params = new URLSearchParams(location.search);
+    var ref = params.get("playlist") || params.get("channel");
     if (!ref) return;
     setMode("channel");
     var input = $("channel-input");
