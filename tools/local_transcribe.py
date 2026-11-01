@@ -185,7 +185,14 @@ def extract(value, directory, **options):
     if str(value).startswith(("https://", "http://")):
         media, source, title = download_media(value, directory, options.get("progress", lambda message: None))
         options.pop("title", None)
-        return transcribe_media(media, directory, source=source, title=title, **options)
+        result = transcribe_media(media, directory, source=source, title=title, **options)
+        # Post caption and date let profile batches label each reel without another request.
+        metadata_file = media.with_suffix(".info.json")
+        metadata = json.loads(metadata_file.read_text("utf-8")) if metadata_file.exists() else {}
+        posted = str(metadata.get("upload_date") or "")
+        result["caption"] = str(metadata.get("description") or "")[:4000]
+        result["posted"] = f"{posted[:4]}-{posted[4:6]}-{posted[6:]}" if len(posted) == 8 else ""
+        return result
     return transcribe_media(value, directory, **options)
 
 

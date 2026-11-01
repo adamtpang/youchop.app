@@ -9,6 +9,14 @@
       ],
       "port": 4325,
       "autoPort": true
+    },
+    {
+      "name": "transcribe",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tools/transcribe-start.mjs"
+      ],
+      "port": 8876
     }
   ]
 }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "YouChop: YouTube & Instagram transcripts",
-  "version": "0.14.0",
-  "description": "Extract YouTube transcripts in your browser. Instagram video posts use the free local transcriber.",
+  "version": "0.15.0",
+  "description": "Extract YouTube transcripts in your browser. Instagram posts and whole profiles use the free local transcriber.",
   "permissions": [
     "clipboardWrite",
     "storage",
@@ -46,6 +46,16 @@
       ],
       "css": [
         "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.instagram.com/*"
+      ],
+      "js": [
+        "instagram.js",
+        "instagram-profile.js"
       ],
       "run_at": "document_idle"
     }

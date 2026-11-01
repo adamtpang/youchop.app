@@ -40,12 +40,28 @@
     go.onclick = async () => { await chrome.tabs.create({ url: instagram }); window.close(); };
     return;
   }
+  if (YouChopInstagram.profileFrom(url)) {
+    msg.textContent = "Find this profile's posts and transcribe them with the free local tool. Start it with npm run transcribe in the YouChop folder.";
+    go.disabled = false;
+    go.textContent = "Chop this profile";
+    go.onclick = async () => {
+      try {
+        const [{ result }] = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => { if (typeof window.__youchopIgOpen !== "function") return false; window.__youchopIgOpen(); return true; },
+        });
+        if (!result) throw new Error("not ready");
+        window.close();
+      } catch { msg.textContent = "Reload the Instagram tab and try again."; }
+    };
+    return;
+  }
   const onVideo = /youtube\.com\/(watch\?|shorts\/)/.test(url);
   const playlistId = YC.playlistIdFrom(url);
   const channelRef = YC.channelRefFrom(url);
 
   if (!onVideo && !playlistId && !channelRef) {
-    msg.textContent = "Open a YouTube video, playlist, channel, or Instagram video post, then click Chop.";
+    msg.textContent = "Open a YouTube video, playlist, channel, Instagram post, or Instagram profile, then click Chop.";
     return;
   }
   msg.textContent = channelRef ? "Choose this channel’s video order, filters, and queue size." : playlistId

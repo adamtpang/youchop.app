@@ -13,6 +13,7 @@
  * once because those builds cannot be safely detached.
  */
 importScripts('channel-queue.js');
+importScripts('instagram.js');
 importScripts('deep-transcribe.js');
 chrome.runtime.onInstalled.addListener(async () => {
   const currentBuild = chrome.runtime.getManifest().version;

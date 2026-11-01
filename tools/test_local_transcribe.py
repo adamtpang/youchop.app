@@ -81,6 +81,18 @@ class TranscribeTests(unittest.TestCase):
         self.assertEqual(json.loads(out['transcript.json'])['segments'][0]['text'], 'Names & numbers: 85%.')
         self.assertIn('85%', out['transcript.md'])
 
+    def test_extract_adds_post_caption_and_date_for_profile_batches(self):
+        with tempfile.TemporaryDirectory() as folder:
+            media = Path(folder) / 'ABC123.m4a'
+            media.write_bytes(b'audio')
+            media.with_suffix('.info.json').write_text(json.dumps({'description': 'Sell the job', 'upload_date': '20261029'}))
+            with patch('local_transcribe.download_media', return_value=(media, 'https://www.instagram.com/reel/ABC123/', 'Video')), \
+                 patch('local_transcribe.transcribe_media', return_value={'segments': [], 'words': 0}):
+                from local_transcribe import extract
+                result = extract('https://www.instagram.com/reel/ABC123/', folder)
+            self.assertEqual(result['caption'], 'Sell the job')
+            self.assertEqual(result['posted'], '2026-10-29')
+
     def test_reused_output_folder_never_transcribes_an_older_posts_file(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)

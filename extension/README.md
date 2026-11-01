@@ -44,6 +44,19 @@ Audio is obtained with yt-dlp and transcribed on this computer with Whisper. No
 speech-service upload or paid API. Local audio/video file input is also supported.
 See [INSTAGRAM-TRANSCRIPTS.md](../INSTAGRAM-TRANSCRIPTS.md) for setup and limitations.
 
+### Chop profile (v0.15.0)
+
+On an Instagram profile (`/username/` or `/username/reels/`), a **Chop profile** button
+appears (also in the popup). **Find posts** scrolls the grid and collects post links,
+up to a limit (default 100, max 300). It only reads links: no likes, follows or
+messages. Signed out, Instagram shows only about 12 posts per tab, so sign in for the
+full grid. **Transcribe** sends each post URL, one at a time, through the background
+bridge to the local transcriber (`npm run transcribe`), which downloads the audio
+anonymously; your Instagram cookies never leave the browser. Photo posts and private
+posts are listed as failed; music-only reels as no speech. The result is one Markdown
+file with an index, captions, dates and timestamped transcripts. Rerunning while the
+local transcriber stays open reuses finished posts.
+
 ## Channel queues
 
 Open a YouTube channel and click **Build channel queue** (also available from the extension popup). Choose **Latest**, **Most popular**, or **Oldest**, request **1–50 videos**, and optionally filter by minimum/maximum duration in minutes and text in the title. The builder follows YouTube’s native sort order and fetches additional pages until enough matching videos are found, the channel ends, or the 2,000-video / 70-page scan limit is reached. An incomplete scan is labeled; duration filters exclude videos whose duration is unavailable.

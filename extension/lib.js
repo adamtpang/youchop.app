@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.14.0",
+  BUILD: "0.15.0",
   TRACE_CAP: 240,
   TRANSCRIPT_CACHE_KEY: "youchop.transcripts.v1",
   TRANSCRIPT_CACHE_TTL_MS: 90 * 24 * 60 * 60 * 1000,
