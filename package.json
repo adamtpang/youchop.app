@@ -9,6 +9,6 @@
     "transcribe": "node tools/transcribe-start.mjs"
   },
   "dependencies": {
-    "@vercel/functions": "^3.9.5"
+    "@vercel/functions": "^3.10.5"
   }
 }
