@@ -191,16 +191,26 @@ function cleanTitle(s) {
   return t || "Section";
 }
 
+// How many chapters a video of this length should get. The count grows with the
+// square root of the runtime, so chapters get longer as the video does instead of
+// multiplying: about 6 for 10 minutes, 11 for 30, 15 for an hour, 20 for 100
+// minutes and 31 for four hours. A fixed spacing of 2.5 minutes gave a 100-minute
+// video 40 chapters, which is too many to skim.
+function targetChapterCount(duration) {
+  const minutes = Math.max(0, Number(duration) || 0) / 60;
+  return Math.max(3, Math.min(40, Math.round(2 * Math.sqrt(minutes))));
+}
+
 function targetChapterSeconds(duration) {
-  return duration < 180 ? 45 : duration < 900 ? 90 : 150;
+  return Math.max(30, Math.round((Number(duration) || 0) / targetChapterCount(duration)));
 }
 
 function heuristicChapters(segs, videoDuration = 0) {
   if (!segs.length) return [];
   const lastStart = segs[segs.length - 1].start;
   const duration = Math.max(lastStart, videoDuration, 1);
-  // Keep cutting through the final transcript row. There is intentionally no
-  // chapter-count ceiling: a long video needs more chapters, not an early stop.
+  // Keep cutting through the final transcript row, at a spacing sized to the
+  // runtime (see targetChapterCount).
   const targetSec = targetChapterSeconds(duration);
 
   const chapters = [{ start: 0, title: cleanTitle(segs[0].text) }];
@@ -217,7 +227,7 @@ function heuristicChapters(segs, videoDuration = 0) {
     const elapsed = s.start - bucketStart;
     const hardGap = gap >= 4; // caption silence / new beat
     const longEnough = elapsed >= targetSec;
-    const force = longEnough && (hardGap || elapsed >= targetSec * 1.6);
+    const force = longEnough && (hardGap || elapsed >= targetSec * 1.25);
 
     if (force && s.start - lastCut >= Math.min(30, targetSec * 0.5)) {
       chapters.push({ start: s.start, title: cleanTitle(s.text) });
@@ -312,9 +322,8 @@ Rules:
 - start is integer seconds from the beginning of the video
 - Titles: 3–7 words, topic-based, search-friendly. Never "Introduction", "Main Discussion", "Conclusion", "Part 1"
 - Prefer natural topic shifts over fixed intervals
-- About 1 chapter per 1.5–3 minutes; minimum 3, with no fixed maximum
-- Cover the complete video and every major topic through the final transcript timestamp
-- Do not stop after 20 chapters or any other arbitrary count
+- Aim for about ${duration ? targetChapterCount(duration) : "one chapter per 5 minutes, so roughly 20 for a 100-minute video,"} chapters${duration ? ` (roughly one per ${Math.max(1, Math.round(targetChapterSeconds(duration) / 60))} minutes)` : ""}; a few more or fewer is fine, minimum 3. Merge small points into the larger topic they belong to
+- Spread chapters across the complete video through the final transcript timestamp; do not bunch them at the start
 - No markdown, no commentary, no trailing commas
 
 Video title: ${title || "(unknown)"}

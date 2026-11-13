@@ -97,23 +97,33 @@ test("chapterize recognises creator timestamps in the video description", async 
   }
 });
 
-test("heuristic chapter generation has no 20-chapter ceiling and reaches the end", async () => {
+test("heuristic chapter count scales with video length and reaches the end", async () => {
   const previousFetch = global.fetch;
   global.fetch = async () => ({ ok: true, status: 200, text: async () => "<html></html>" });
   try {
-    const segments = Array.from({ length: 26 }, (_, index) => ({
-      t: index * 151,
-      text: `Topic ${index + 1} with a distinct practical lesson`,
-    }));
-    const result = await invoke({
-      id: "abcdefghijk",
-      engine: "heuristic",
-      meta: { title: "Long video", duration: 3900 },
-      segments,
-    });
-    assert.equal(result.status, 200);
-    assert.ok(result.body.chapters.length > 20);
-    assert.equal(result.body.chapters.at(-1).start, segments.at(-1).t);
+    const run = async (minutes) => {
+      // one caption line every 8 seconds, like real auto-captions
+      const segments = Array.from({ length: Math.floor(minutes * 60 / 8) }, (_, index) => ({
+        t: index * 8,
+        text: `Topic ${index + 1} with a distinct practical lesson`,
+      }));
+      const result = await invoke({
+        id: "abcdefghijk",
+        engine: "heuristic",
+        meta: { title: "Long video", duration: minutes * 60 },
+        segments,
+      });
+      assert.equal(result.status, 200);
+      return { result, segments };
+    };
+    const { result, segments } = await run(100);
+    const count = result.body.chapters.length;
+    assert.ok(count >= 15 && count <= 22, `100 minutes gave ${count} chapters`);
+    assert.ok(segments.at(-1).t - result.body.chapters.at(-1).start < 600, "last chapter is near the end");
+    const short = (await run(10)).result.body.chapters.length;
+    assert.ok(short >= 4 && short <= 7, `10 minutes gave ${short} chapters`);
+    const long = (await run(240)).result.body.chapters.length;
+    assert.ok(long >= 24 && long <= 34, `240 minutes gave ${long} chapters`);
     assert.match(result.body.pasteWithCredit, /\n\n⏱ Chapters by https:\/\/youchop\.app$/);
   } finally {
     global.fetch = previousFetch;
