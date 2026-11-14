@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouChop: YouTube & Instagram transcripts",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Extract YouTube transcripts in your browser. Instagram posts and whole profiles use the free local transcriber.",
   "permissions": [
     "clipboardWrite",
@@ -12,7 +12,7 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://youchop.app/*",
+    "https://youchop.vercel.app/*",
     "http://127.0.0.1/*"
   ],
   "icons": {

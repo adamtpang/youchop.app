@@ -97,13 +97,26 @@
         <span id="yc-doc-count"></span>
       </div>
       <textarea class="yc-out" id="yc-out" readonly></textarea>
-      <div class="yc-foot" id="yc-foot"></div>`;
+      <div class="yc-foot" id="yc-foot"></div>
+      <details class="yc-debug" id="yc-debug">
+        <summary>Debug log</summary>
+        <div class="yc-debug-actions">
+          <button class="yc-btn ghost" id="yc-debug-copy">Copy log</button>
+          <button class="yc-btn ghost" id="yc-refresh">Chop again (ignore saved copy)</button>
+        </div>
+        <pre id="yc-debug-log"></pre>
+      </details>`;
     (document.fullscreenElement || document.body).appendChild(el);
     // Always show the running build. A stale content script is invisible otherwise:
     // reloading the extension does not replace scripts already injected into open
     // tabs, so an old version can keep answering long after the files changed.
     $("#yc-ver", el).textContent = "v" + (typeof YC !== "undefined" ? YC.BUILD : "?");
     $("#yc-close", el).onclick = closePanel;
+    $("#yc-debug-copy", el).onclick = async () => {
+      const text = $("#yc-debug-log", el).textContent;
+      try { await navigator.clipboard.writeText(text); toast("Debug log copied."); }
+      catch { toast("Clipboard blocked; select the log text instead."); }
+    };
     return el;
   }
 
@@ -113,10 +126,17 @@
   }
 
   /* ---------- the click ---------- */
-  async function chop() {
+  async function chop(options = {}) {
     const id = currentVideoId();
     if (!id) return;
     const el = panel();
+    // The log stays on screen for every run, success or failure, and refreshes
+    // as each step is traced, so "it only shows timestamps" can be traced to the
+    // exact step that produced it.
+    const debugLog = $("#yc-debug-log", el);
+    const showLog = () => { if (el.isConnected) debugLog.textContent = YC.formatTrace(); };
+    const logTimer = setInterval(() => { if (!el.isConnected) clearInterval(logTimer); else showLog(); }, 500);
+    $("#yc-refresh", el).onclick = () => chop({ refresh: true });
     const out = $("#yc-out", el);
     out.value = "";
     let state = { segs: null, meta: null, format: "timestamps" };
@@ -155,15 +175,24 @@
       $("#yc-chapters", el).disabled = true;
       deepNote.textContent = "Starting local audio transcription. This can take several minutes. Closing Chop keeps the local job running.";
       try {
+        YC.trace("deep.start.request", { videoId: id });
         const job = await deepRequest("start");
+        YC.trace("deep.start.response", { jobId: job?.id || null, status: job?.status || null });
+        let lastStatus = "";
         while (stillHere()) {
           const status = await deepRequest("status", job.id);
+          const line = `${status.status}: ${status.message || ""}`;
+          if (line !== lastStatus) { YC.trace("deep.status", { status: status.status, message: String(status.message || "").slice(0, 160) }); lastStatus = line; }
           if (!stillHere()) return;
           if (status.status === "error") throw new Error(status.message);
           if (status.status === "done") {
             const r = status.result;
+            YC.trace("deep.result", { segments: r?.segments?.length || 0, words: r?.words || 0, duration: r?.durationSeconds || 0,
+              processing: r?.processing || "", firstKeys: Object.keys(r?.segments?.[0] || {}) });
             if (!r?.segments?.length) throw new Error("No speech was detected in the audio. The original transcript is still shown.");
-            const segs = r.segments.map(s => ({ t: s.start, text: s.text }));
+            const segs = r.segments.map(s => ({ t: Math.floor(Number(s.start) || 0), text: String(s.text || "").trim() }))
+              .filter(s => s.text);
+            if (!YC.usable(segs, "deep_transcribe")) throw new Error("Deep transcribe returned timestamps without words. Copy the debug log below and send it.");
             const meta = { videoId: id, title: r.title || state.meta?.title || document.title,
               author: state.meta?.author || "", duration: r.durationSeconds };
             await YC.saveTranscriptCache(id, "en", segs, meta, "local-whisper");
@@ -175,6 +204,7 @@
           await new Promise(resolve => setTimeout(resolve, 1500));
         }
       } catch (error) {
+        YC.trace("deep.failed", { error: String(error?.message || error).slice(0, 240) });
         if (stillHere()) deepNote.textContent = error.message || String(error);
       } finally {
         deepBusy = false;
@@ -186,6 +216,7 @@
 
     function showResult(res) {
       if (!el.isConnected || currentVideoId() !== id) return;
+      YC.trace("ui.show_result", { source: res.source, format: state.format, ...YC.segQuality(res.segs) });
       out.readOnly = true;
       $("#yc-foot", el).textContent = "";
       $("#yc-fmt", el).style.visibility = "visible";
@@ -293,10 +324,13 @@
       }
     }
     try {
-      const res = await YC.extract(id, "timestamps", "en", onProgress);
+      const res = await YC.extract(id, "timestamps", "en", onProgress, { refresh: !!options.refresh });
       showResult(res);
+      showLog();
     } catch (err) {
       if (!stillHere()) return;
+      YC.trace("ui.extract_failed", { error: String(err?.message || err).split("\n")[0].slice(0, 200) });
+      showLog();
       $("#yc-deep", el).style.display = "flex";
       deepNote.textContent = "No ready transcript. Deep transcribe downloads the audio and creates timestamps locally for free. A missing speech model downloads once.";
       // Persist before rendering. The diagnostic is only in the DOM until the

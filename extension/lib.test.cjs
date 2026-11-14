@@ -374,3 +374,48 @@ test("lists a private playlist from the signed-in page before calling the public
     global.fetch = previousFetch;
   }
 });
+
+test("rows that are only timestamps or accessibility labels do not count as words", () => {
+  const q = YC.segQuality([
+    { t: 0, text: "0:12" }, { t: 5, text: "12 seconds" }, { t: 9, text: "[0:09]" }, { t: 12, text: "hello world" },
+  ]);
+  assert.equal(q.rows, 4);
+  assert.equal(q.withWords, 1);
+  assert.equal(q.totalWords, 2);
+  assert.equal(YC.usable([{ t: 0, text: "0:12" }, { t: 5, text: "5 seconds" }], "test"), false);
+  assert.equal(YC.usable([{ t: 0, text: "real words" }, { t: 5, text: "0:05" }], "test"), true);
+  assert.match(YC.formatTrace(), /REJECTED: rows without words/);
+});
+
+test("a saved transcript with no words is discarded and extracted fresh", async () => {
+  const previousChrome = global.chrome;
+  const previousDocument = global.document;
+  const previousLocation = global.location;
+  const previousOpenPanel = YC.openPanel;
+  const values = {};
+  global.chrome = {
+    runtime: { getManifest: () => ({ version: manifest.version }) },
+    storage: { local: {
+      async get(key) { return { [key]: values[key] }; },
+      async set(payload) { Object.assign(values, payload); },
+    } },
+  };
+  global.document = { title: "Lesson - YouTube", querySelector: () => null };
+  global.location = { href: "https://www.youtube.com/watch?v=abcdefghijk" };
+  let opened = false;
+  try {
+    await YC.saveTranscriptCache("abcdefghijk", "en",
+      [{ t: 0, text: "0 seconds" }, { t: 7, text: "7 seconds" }],
+      { videoId: "abcdefghijk", title: "Lesson", author: "", duration: 60 }, "panel");
+    YC.openPanel = async () => { opened = true; throw new Error("stop after the cache check"); };
+    await assert.rejects(YC.extract("abcdefghijk", "timestamps", "en", null, { localOnly: true }));
+    assert.equal(opened, true);
+    assert.match(YC.formatTrace(), /path\.browser_cache\.discarded/);
+    assert.equal(await YC.readTranscriptCache("abcdefghijk", "en"), null);
+  } finally {
+    YC.openPanel = previousOpenPanel;
+    global.chrome = previousChrome;
+    global.document = previousDocument;
+    global.location = previousLocation;
+  }
+});

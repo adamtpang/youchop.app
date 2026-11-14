@@ -125,6 +125,14 @@ button.youchop-inject.youchop-floating {
 #youchop-panel .yc-foot {
   padding: 0 14px 12px; font-size: 11.5px; color: #ffb43a; min-height: 14px;
 }
+#youchop-panel .yc-debug { margin: 0 14px 12px; color: #aaa7b0; font: 12px Roboto, sans-serif; }
+#youchop-panel .yc-debug summary { cursor: pointer; padding: 4px 0; }
+#youchop-panel .yc-debug-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+#youchop-panel .yc-debug pre {
+  max-height: 220px; overflow: auto; margin: 0; padding: 10px;
+  background: #0f0f14; color: #c9c6d0; border: 1px solid #2a2a33; border-radius: 8px;
+  font: 11px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
+}
 
 #youchop-panel .yc-queue { overflow-y: auto; padding: 0 16px 16px; min-height: 0; color: #f2efe9; }
 #youchop-panel .yc-queue p { color: #aaa7b0; font: 13px/1.5 Roboto, sans-serif; }
