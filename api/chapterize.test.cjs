@@ -45,7 +45,7 @@ test("chapterize skips transcript providers when browser rows are supplied", asy
     assert.equal(result.body.engine, "heuristic");
     assert.ok(result.body.chapters.length >= 2);
     assert.match(result.body.paste, /^0:00 /);
-    assert.match(result.body.pasteWithCredit, /https:\/\/youchop\.app$/);
+    assert.match(result.body.pasteWithCredit, /https:\/\/youchop\.vercel\.app$/);
     assert.deepEqual(urls, ["https://www.youtube.com/watch?v=abcdefghijk"]);
   } finally {
     global.fetch = previousFetch;
@@ -124,7 +124,7 @@ test("heuristic chapter count scales with video length and reaches the end", asy
     assert.ok(short >= 4 && short <= 7, `10 minutes gave ${short} chapters`);
     const long = (await run(240)).result.body.chapters.length;
     assert.ok(long >= 24 && long <= 34, `240 minutes gave ${long} chapters`);
-    assert.match(result.body.pasteWithCredit, /\n\n⏱ Chapters by https:\/\/youchop\.app$/);
+    assert.match(result.body.pasteWithCredit, /\n\n⏱ Chapters by https:\/\/youchop\.vercel\.app$/);
   } finally {
     global.fetch = previousFetch;
   }

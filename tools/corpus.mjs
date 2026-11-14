@@ -47,7 +47,7 @@ if (!channels.length) {
 const TOP = opt.top || "20";
 const MIN_MIN = Number(opt["min-minutes"] ?? 20);
 const OUT_ROOT = opt.out || "./corpus";
-const ENDPOINT = opt.endpoint || "https://youchop.app/api/transcripts";
+const ENDPOINT = opt.endpoint || "https://youchop.vercel.app/api/transcripts";
 const PAUSE = Number(opt.pause ?? 900);
 const LOCAL = !!opt.local;
 // --brain also emits a ready-to-run gbrain brain next to the corpus

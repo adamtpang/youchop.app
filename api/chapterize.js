@@ -19,7 +19,7 @@ const { decodeCaptionText } = require("./text");
 const MODEL = process.env.CHAPTERIZE_MODEL || "claude-haiku-4-5-20251001";
 const MAX_TRANSCRIPT_CHARS = 600_000;
 const MAX_SUPPLIED_SEGMENTS = 20_000;
-const CHAPTER_CREDIT = "⏱ Chapters by https://youchop.app";
+const CHAPTER_CREDIT = "⏱ Chapters by https://youchop.vercel.app";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
   "Chrome/124.0.0.0 Safari/537.36";

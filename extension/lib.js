@@ -11,7 +11,7 @@
    declared" and leave the stale build in place; `var` replaces the object, and the
    running content script picks the new one up because it looks YC up globally. */
 var YC = {
-  BUILD: "0.15.0",
+  BUILD: "0.15.1",
   TRACE_CAP: 240,
   TRANSCRIPT_CACHE_KEY: "youchop.transcripts.v1",
   TRANSCRIPT_CACHE_TTL_MS: 90 * 24 * 60 * 60 * 1000,
@@ -35,8 +35,63 @@ var YC = {
       catch { text = String(detail); }
     }
     const elapsed = String(Date.now() - YC.traceStartedAt).padStart(5, " ");
-    YC.traceLog.push(`+${elapsed}ms ${stage}${text ? ` ${text}` : ""}`);
+    const line = `+${elapsed}ms ${stage}${text ? ` ${text}` : ""}`;
+    YC.traceLog.push(line);
+    // Mirror every step to the page console so a run can be followed live in
+    // DevTools (filter on "[youchop]"), not only read back after it ends.
+    try { console.log("[youchop]", line); } catch {}
     if (YC.traceLog.length > YC.TRACE_CAP) YC.traceLog.splice(0, YC.traceLog.length - YC.TRACE_CAP);
+  },
+
+  /* Log the shape of the first transcript row once per run: each child's tag,
+     class and text length. No transcript text, only structure, so a markup
+     change that hides the words is visible in the trace. */
+  tracePanelShape() {
+    if (YC.tracedShapeAt === YC.traceStartedAt) return;
+    const segs = document.querySelectorAll("transcript-segment-view-model, ytd-transcript-segment-renderer");
+    const first = segs[0];
+    if (!first) return;
+    YC.tracedShapeAt = YC.traceStartedAt;
+    const describe = (el, depth) => [...el.children].slice(0, 6).map((kid) => ({
+      tag: kid.tagName.toLowerCase(),
+      cls: String(kid.className || "").slice(0, 60),
+      chars: (kid.textContent || "").trim().length,
+      kids: depth < 2 ? describe(kid, depth + 1) : undefined,
+    }));
+    const panels = [...document.querySelectorAll("ytd-engagement-panel-section-list-renderer")]
+      .filter((p) => /transcript/i.test(p.getAttribute("target-id") || ""))
+      .map((p) => `${p.getAttribute("target-id")}=${(p.getAttribute("visibility") || "").replace("ENGAGEMENT_PANEL_VISIBILITY_", "")}`);
+    YC.trace("panel.row_shape", { segments: segs.length, panels, tag: first.tagName.toLowerCase(), children: describe(first, 0) });
+  },
+
+  /* How many rows actually carry words. A row whose "text" is only a timestamp,
+     an accessibility label such as "12 seconds", or punctuation is not speech,
+     and a transcript made of those renders as timestamps with nothing after them. */
+  wordless(text) {
+    const s = String(text || "").trim();
+    return !s || !/\p{L}/u.test(s) || YC.A11Y_LABEL.test(s) || /^[\[\]\d:.,\s-]+$/.test(s);
+  },
+
+  segQuality(segs) {
+    const rows = Array.isArray(segs) ? segs : [];
+    const words = rows.filter((s) => !YC.wordless(s?.text)).length;
+    return {
+      rows: rows.length,
+      withWords: words,
+      wordless: rows.length - words,
+      totalWords: rows.reduce((n, s) => n + (YC.wordless(s?.text) ? 0 : String(s.text).trim().split(/\s+/).length), 0),
+      firstTimes: rows.slice(0, 3).map((s) => s?.t),
+      firstTextLengths: rows.slice(0, 3).map((s) => String(s?.text || "").length),
+    };
+  },
+
+  // A result is usable when at least half its rows have words. Anything less is
+  // the "timestamps with no words" failure, so the caller moves to the next path.
+  usable(segs, label) {
+    const q = YC.segQuality(segs);
+    const ok = q.rows > 0 && q.withWords >= Math.ceil(q.rows / 2);
+    YC.trace(`quality.${label}`, { ...q, verdict: ok ? "usable" : "REJECTED: rows without words" });
+    return ok;
   },
 
   formatTrace() {
@@ -454,6 +509,7 @@ var YC = {
       const r = mk(stampEl.textContent.trim(), YC.rowText(seg, stampEl));
       if (r) rows.push(r);
     }
+    YC.tracePanelShape();
     if (rows.length) { YC.lastPanelStrategy = "transcript-segment-view-model"; return rows; }
 
     // 2. class-name variants, in case the element was renamed
@@ -669,6 +725,20 @@ var YC = {
 
   transcriptCacheId(videoId, lang = "en") {
     return `${String(videoId || "")}:${String(lang || "en").toLowerCase()}`;
+  },
+
+  async deleteTranscriptCache(videoId, lang = "en") {
+    const store = YC.storage();
+    if (!store) return false;
+    try {
+      const payload = await store.get(YC.TRANSCRIPT_CACHE_KEY);
+      const records = { ...(payload?.[YC.TRANSCRIPT_CACHE_KEY] || {}) };
+      delete records[YC.transcriptCacheId(videoId, lang)];
+      await store.set({ [YC.TRANSCRIPT_CACHE_KEY]: records });
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   async readTranscriptCache(videoId, lang = "en") {
@@ -1102,7 +1172,7 @@ var YC = {
   /* Ask youchop.app to fetch it. Used when the local paths are unavailable. */
   async fromApi(videoId, lang) {
     YC.trace("youchop.api.request", { videoId, lang: lang || "en" });
-    const r = await fetch("https://youchop.app/api/transcripts", {
+    const r = await fetch("https://youchop.vercel.app/api/transcripts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [videoId], lang: lang || "en", timestamps: true }),
@@ -1179,7 +1249,7 @@ var YC = {
         duration: Math.max(0, Math.floor(Number(meta?.duration) || 0)),
       };
     }
-    const r = await fetch("https://youchop.app/api/chapterize", {
+    const r = await fetch("https://youchop.vercel.app/api/chapterize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1202,7 +1272,7 @@ var YC = {
     if (local?.videos?.length) return local;
 
     const r = await fetch(
-      "https://youchop.app/api/playlist-videos?listId=" + encodeURIComponent(listId)
+      "https://youchop.vercel.app/api/playlist-videos?listId=" + encodeURIComponent(listId)
     );
     const raw = await r.text();
     let d = null;
@@ -1294,7 +1364,10 @@ var YC = {
 
     if (!options.refresh) {
       const cached = await YC.readTranscriptCache(videoId, lang);
-      if (cached) {
+      if (cached && !YC.usable(cached.segs, "browser_cache")) {
+        YC.trace("path.browser_cache.discarded", { reason: "saved copy has no words; extracting fresh" });
+        await YC.deleteTranscriptCache(videoId, lang);
+      } else if (cached) {
         meta = { ...meta, ...cached.meta, videoId };
         segs = cached.segs;
         source = "browser-cache";
@@ -1323,6 +1396,7 @@ var YC = {
       segs = await YC.harvestPanel(
         onProgress ? (f, n, eta) => onProgress(0.25 + f * 0.75, n, eta, "reading transcript") : null
       );
+      if (segs?.length && !YC.usable(segs, "panel")) segs = null;
       if (segs?.length) {
         source = "panel";
         YC.trace("path.panel.success", { rows: segs.length });
@@ -1342,7 +1416,7 @@ var YC = {
       p(0.3, "panel stalled, asking YouTube directly");
       try {
         const s = await YC.fetchTranscriptContinuation();
-        if (s.length) {
+        if (s.length && YC.usable(s, "youtube_transcript")) {
           segs = s; source = "youtube-transcript";
           YC.lastTranscriptNote = `${s.length} lines`;
           p(0.58, `got ${s.length} lines from YouTube`);
@@ -1372,7 +1446,7 @@ var YC = {
         else {
           p(0.46, `downloading ${track.languageCode || lang} captions${track.kind === "asr" ? " (auto-generated)" : ""}`);
           const s = await YC.fetchTrack(track);
-          if (s.length) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; p(0.58, `got ${s.length} lines`); }
+          if (s.length && YC.usable(s, "captions")) { segs = s; source = "captions"; YC.lastCaptionNote = `${s.length} lines`; p(0.58, `got ${s.length} lines`); }
           else { YC.lastCaptionNote = "endpoint returned empty (PoToken bot-gate)"; p(0.5, "YouTube returned an empty caption file"); }
         }
       } catch (e) {
@@ -1392,6 +1466,7 @@ var YC = {
       if (onProgress) onProgress(0.6, 0, null, "asking youchop.app (last resort)");
       try {
         const api = await YC.fromApi(videoId, lang);
+        if (!YC.usable(api.rows, "youchop_api")) throw new Error("youchop.app returned timestamps without words");
         segs = api.rows; source = "youchop.app";
         if (api.title) meta.title = api.title;
         if (api.author) meta.author = api.author;
@@ -1426,6 +1501,9 @@ var YC = {
     }
 
     if (!segs?.length) throw new Error("no transcript available for this video");
+    if (!YC.usable(segs, "final")) {
+      throw new Error(`Every path returned timestamps without words.\n\ndebug trace:\n${YC.formatTrace()}`);
+    }
     const saved = await YC.saveTranscriptCache(videoId, lang, segs, meta, source);
     YC.trace("path.browser_cache.write", { saved, rows: segs.length });
     YC.trace("extract.success", { source, rows: segs.length, titleChars: meta.title.length, authorChars: meta.author.length });
